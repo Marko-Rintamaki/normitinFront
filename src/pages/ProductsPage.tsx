@@ -10,38 +10,44 @@ const SearchInput = memo<{
   value: string;
   onChange: (value: string) => void;
   onSubmit: (e: React.FormEvent) => void;
-  isConnected: boolean;
-  hasSearched: boolean;
   onClear: () => void;
-}>(({ value, onChange, onSubmit, isConnected, hasSearched, onClear }) => {
+  activeOnly: boolean | null;
+  onActiveOnlyChange: (value: boolean | null) => void;
+}>(({ value, onChange, onSubmit, onClear, activeOnly, onActiveOnlyChange }) => {
   return (
     <form onSubmit={onSubmit} className="search-form">
-      <div className="search-input-group">
+      <div className="search-input-container">
         <input
           type="text"
           placeholder="🔍 Hae tuotteita... (hakutulokset päivittyvät reaaliajassa)"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="search-input"
+          className="search-input-with-clear"
           autoComplete="off"
           spellCheck="false"
         />
         <button 
-          type="submit" 
-          className="btn btn-primary search-btn"
-          disabled={!isConnected}
+          type="button" 
+          onClick={onClear}
+          className={`search-clear-btn ${!value ? 'disabled' : ''}`}
+          title="Tyhjennä hakukenttä"
+          disabled={!value}
         >
-          🔍 Hae
+          ✕
         </button>
-        {hasSearched && (
-          <button 
-            type="button" 
-            onClick={onClear}
-            className="btn btn-secondary clear-btn"
-          >
-            ✕ Tyhjennä
-          </button>
-        )}
+        <select
+          value={activeOnly === null ? 'all' : activeOnly ? 'active' : 'inactive'}
+          onChange={(e) => {
+            const val = e.target.value;
+            onActiveOnlyChange(val === 'all' ? null : val === 'active');
+          }}
+          className="search-active-filter"
+          title="Näytä vain aktiiviset tuotteet"
+        >
+          <option value="all">Kaikki tuotteet</option>
+          <option value="active">Vain aktiiviset</option>
+          <option value="inactive">Vain epäaktiiviset</option>
+        </select>
       </div>
     </form>
   );
@@ -302,6 +308,13 @@ export const ProductsPage = () => {
     setSearchQuery(newValue);
   }, []);
 
+  const handleActiveOnlyChange = useCallback((newValue: boolean | null) => {
+    setSearchFilters(prev => ({
+      ...prev,
+      activeOnly: newValue
+    }));
+  }, []);
+
   const handleSearchSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     // Haku tapahtuu nyt automaattisesti, tämä on varmuuden vuoksi
@@ -325,13 +338,6 @@ export const ProductsPage = () => {
       activeOnly: null
     });
     loadProducts();
-  };
-
-  const updateSearchFilter = (key: string, value: string | boolean | null) => {
-    setSearchFilters(prev => ({
-      ...prev,
-      [key]: value
-    }));
   };
 
   // Context menu käsittelijät
@@ -475,9 +481,9 @@ export const ProductsPage = () => {
               value={searchQuery}
               onChange={handleSearchQueryChange}
               onSubmit={handleSearchSubmit}
-              isConnected={connectionStatus.connected}
-              hasSearched={hasSearched}
               onClear={clearSearch}
+              activeOnly={searchFilters.activeOnly}
+              onActiveOnlyChange={handleActiveOnlyChange}
             />
         
         {/* Suodattimet samassa kortissa */}
@@ -531,46 +537,13 @@ export const ProductsPage = () => {
               </div>
             )}
           </div>
-
-          {hasSearched && (
-            <div className="filter-group">
-              <label htmlFor="active-search-filter">Tila:</label>
-              <select
-                id="active-search-filter"
-                value={searchFilters.activeOnly === null ? '' : searchFilters.activeOnly.toString()}
-                onChange={(e) => updateSearchFilter('activeOnly', e.target.value === '' ? null : e.target.value === 'true')}
-                className="form-control"
-              >
-                <option value="">Kaikki</option>
-                <option value="true">Vain aktiiviset</option>
-                <option value="false">Vain ei-aktiiviset</option>
-              </select>
-            </div>
-          )}
-        </div>
         </div> {/* filters-section */}
       </div> {/* search-card */}
+      </div> {/* search-section */}
 
       {/* Selaussuodattimet - näytetään vain selailutilassa */}
       {!hasSearched && (
         <div className="products-controls">
-          <div className="control-group">
-            <label htmlFor="filter">Suodata:</label>
-            <select
-              id="filter"
-              value={searchFilters.activeOnly === null ? 'all' : searchFilters.activeOnly === true ? 'active' : 'inactive'}
-              onChange={(e) => {
-                const value = e.target.value;
-                updateSearchFilter('activeOnly', value === 'all' ? null : value === 'active');
-              }}
-              className="form-control"
-            >
-              <option value="all">Kaikki tuotteet</option>
-              <option value="active">Aktiiviset</option>
-              <option value="inactive">Ei aktiiviset</option>
-            </select>
-          </div>
-
           <div className="control-group">
             <label htmlFor="sort">Järjestä:</label>
             <select
@@ -729,7 +702,6 @@ export const ProductsPage = () => {
             
       </div> {/* container-fluid */}
     </div> {/* products-page */}
-  
     </div>
   );
 };
