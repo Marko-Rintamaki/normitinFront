@@ -325,6 +325,26 @@ export class SocketClient {
     return this.apiRequest('create_package', params) as Promise<ApiResponse<{ success: boolean; package_id?: string }>>;
   }
 
+  // Hae kaikki paketit
+  public async getAllPackages(): Promise<ApiResponse<Array<{
+    package_id?: string;
+    package_name: string;
+    package_product_line: string;
+    package_number: string;
+    memo?: string;
+    created?: string;
+  }>>> {
+    // Käytetään geneeristä apiRequest kutsua, backend endpoint toteutetaan myöhemmin
+    return this.apiRequest('get_packages', {}) as Promise<ApiResponse<Array<{
+      package_id?: string;
+      package_name: string;
+      package_product_line: string;
+      package_number: string;
+      memo?: string;
+      created?: string;
+    }>>>;
+  }
+
   // Utility method for periodic ping to keep connection alive
   public startHeartbeat(interval: number = 30000): number {
     return window.setInterval(() => {

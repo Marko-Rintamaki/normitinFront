@@ -128,6 +128,17 @@ export const ProductsPage = () => {
     method_name: string;
     method_description?: string;
   }>>([]);
+
+  // Kaikki paketit ladattu muistiin kerran  
+  const [allPackagesLoaded, setAllPackagesLoaded] = useState(false);
+  const [allPackages, setAllPackages] = useState<Array<{
+    package_id?: string;
+    package_name: string;
+    package_product_line: string;
+    package_number: string;
+    memo?: string;
+    created?: string;
+  }>>([]);
   
   // Ladataan toimittajavalinnat localStoragesta
   const loadSavedSuppliers = (): string[] => {
@@ -301,6 +312,31 @@ export const ProductsPage = () => {
     loadAllInstallations();
   }, [socketClient, allInstallationsLoaded]);
 
+  // Lataa kaikki paketit muistiin kerran sovelluksen käynnistyessä
+  useEffect(() => {
+    const loadAllPackages = async () => {
+      if (!socketClient || allPackagesLoaded) return;
+      
+      try {
+        console.log('📦 Ladataan kaikki paketit muistiin...');
+        const response = await socketClient.getAllPackages();
+        
+        if (response && response.success && Array.isArray(response.data)) {
+          setAllPackages(response.data);
+          setAllPackagesLoaded(true);
+          console.log(`✅ Ladattu ${response.data.length} pakettia muistiin`);
+          console.log('📦 Pakettidata:', response.data);
+        } else {
+          console.log('ℹ️ Pakettien lataus: ei dataa tai epäonnistui:', response);
+        }
+      } catch (error) {
+        console.error('Kaikkien pakettien lataus epäonnistui:', error);
+      }
+    };
+
+    loadAllPackages();
+  }, [socketClient, allPackagesLoaded]);
+
   // Päivittää kaikki asennustavat uudelleen (esim. lisäyksen/poiston jälkeen)
   const refreshAllInstallations = useCallback(async () => {
     if (!socketClient) return;
@@ -315,6 +351,24 @@ export const ProductsPage = () => {
       }
     } catch (error) {
       console.error('Asennustapojen päivitys epäonnistui:', error);
+    }
+  }, [socketClient]);
+
+  // Lataa kaikki paketit muistiin
+  const refreshAllPackages = useCallback(async () => {
+    if (!socketClient) return;
+    
+    try {
+      console.log('🔄 Päivitetään kaikki paketit...');
+      const response = await socketClient.getAllPackages();
+      
+      if (response && response.success && Array.isArray(response.data)) {
+        setAllPackages(response.data);
+        setAllPackagesLoaded(true);
+        console.log(`✅ Päivitetty ${response.data.length} pakettia muistiin`);
+      }
+    } catch (error) {
+      console.error('Pakettien päivitys epäonnistui:', error);
     }
   }, [socketClient]);
 
@@ -516,6 +570,8 @@ export const ProductsPage = () => {
 
       if (response?.success) {
         console.log('Paketti tallennettu onnistuneesti!');
+        // Päivitä paketit jotta uusi paketti näkyy sinisellä
+        await refreshAllPackages();
         alert('Paketti luotu onnistuneesti!');
         handlePackageModalClose();
       } else {
@@ -535,6 +591,21 @@ export const ProductsPage = () => {
       installation.product_code === product.product_code
     );
   }, [allInstallations]);
+
+  // Tarkistaa onko tuotteesta olemassa paketti muistista ladatusta datasta
+  const productHasPackage = useCallback((product: ProductSearchResult): boolean => {
+    const hasPackage = allPackages.some(pkg => 
+      pkg.package_product_line === product.product_line && 
+      pkg.package_number === product.product_code
+    );
+    
+    // Debug-loki
+    if (hasPackage) {
+      console.log(`📦 Tuotteella ${product.product_line}-${product.product_code} on paketti!`);
+    }
+    
+    return hasPackage;
+  }, [allPackages]);
 
   // Laskee tuotteen asennustapojen määrän muistista ladatusta datasta
   const getProductInstallationCount = useCallback((product: ProductSearchResult): number => {
@@ -906,11 +977,17 @@ export const ProductsPage = () => {
               // Käytetään muistista ladattua dataa visuaalisiin indikaattoreihin
               const hasInstallations = productHasInstallations(product);
               const installationCount = getProductInstallationCount(product);
+              const hasPackage = productHasPackage(product);
+              
+              // Debug: Näytetään tila konsolissa
+              if (hasPackage) {
+                console.log(`🎨 Tuote ${product.product_line}-${product.product_code} renderöidään sinisellä (has-package: true)`);
+              }
               
               return (
                 <Fragment key={productKey}>
                   <div 
-                    className="product-row"
+                    className={`product-row ${hasPackage ? 'has-package' : ''}`}
                     onContextMenu={(e) => handleProductRightClick(e, product)}
                   >
                     <div className="product-cell product-number-col">
