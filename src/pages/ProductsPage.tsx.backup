@@ -2,11 +2,45 @@ import { useState, useEffect, useCallback, useMemo, useRef, memo, Fragment } fro
 import { useSocket } from '../context/SocketContext';
 import { ProductContextMenu } from '../components/ProductContextMenu';
 import { InstallationMethodModal } from '../components/InstallationMethodModal';
-import { PackageModal } from '../components/PackageModal';
 import type { ProductSearchResult } from '../types/api';
 import './ProductsPage.css';
 
-// Memoisoitu hakukenttä-komponentti - ei renderöidy uudelleen turhaan
+// Memoisoitu hakukenttä-komponentti - ei renderöidy uudellee    }
+  }, [socketClient]);
+
+  // Lataa kaikki tuotteet joilla on asennustapoja (suorituskykyoptimointia varten)
+  const loadAllProductsWithInstallations = useCallback(async () => {
+    if (!socketClient) return;
+
+    try {
+      console.log('🔧 Haetaan kaikki tuotteet joilla on asennustapoja...');
+      
+      const response = await socketClient.apiRequest({
+        action: 'get_all_products_with_installations'
+      });
+
+      if (response && response.success && response.data) {
+        console.log('📦 Kaikki asennustavat ladattu:', response.data);
+        
+        // Muuta data helpommin käytettävään muotoon: "product_line-product_code" -> method_count
+        const installationsIndex: { [key: string]: number } = {};
+        response.data.forEach((item: { product_line: string; product_code: string; method_count: number }) => {
+          const key = `${item.product_line}-${item.product_code}`;
+          installationsIndex[key] = item.method_count;
+        });
+        
+        setProductsWithInstallations(installationsIndex);
+        console.log('✅ Asennustapojen indeksi päivitetty:', Object.keys(installationsIndex).length, 'tuotetta');
+      } else {
+        console.log('❌ API vastaus ei sisältänyt dataa tai ei onnistunut:', response);
+      }
+    } catch (error) {
+      console.error('Asennustapojen indeksin lataus epäonnistui:', error);
+    }
+  }, [socketClient]);
+
+  // Lataa tuotteen asennustavat
+  const loadProductInstallations = useCallback(async (product: ProductSearchResult) => {turhaan
 const SearchInput = memo<{
   value: string;
   onChange: (value: string) => void;
@@ -62,7 +96,6 @@ export const ProductsPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState('general_name');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [totalProducts, setTotalProducts] = useState(0);
   
   // Virtualisointi ja lazy loading
@@ -95,14 +128,6 @@ export const ProductsPage = () => {
     isOpen: false,
     product: null
   });
-
-  const [packageModal, setPackageModal] = useState<{
-    isOpen: boolean;
-    product: ProductSearchResult | null;
-  }>({
-    isOpen: false,
-    product: null
-  });
   
   // Expanded rivien hallinta asennustapojen näyttämiseksi
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
@@ -118,16 +143,14 @@ export const ProductsPage = () => {
     }>;
   }>({});
 
-  // Kaikki asennustavat ladattu muistiin kerran
-  const [allInstallationsLoaded, setAllInstallationsLoaded] = useState(false);
-  const [allInstallations, setAllInstallations] = useState<Array<{
-    product_line: string;
-    product_code: string;
-    method_code: number;
-    standard_hours: number;
-    method_name: string;
-    method_description?: string;
-  }>>([]);
+  // Kaikki tuotteet joilla on asennustapoja (key: product_line-product_code, value: method_count)
+  const [productsWithInstallations, setProductsWithInstallations] = useState<{
+    [key: string]: number;
+  }>({});
+
+  // Asennustapojen lisäys/muokkaus
+  const [showInstallationModal, setShowInstallationModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<ProductSearchResult | null>(null);
   
   // Ladataan toimittajavalinnat localStoragesta
   const loadSavedSuppliers = (): string[] => {
@@ -277,47 +300,6 @@ export const ProductsPage = () => {
     loadProductLines();
   }, [loadProducts, loadSuppliers, loadProductLines, hasSearched]);
 
-  // Lataa kaikki asennustavat muistiin kerran sovelluksen käynnistyessä
-  useEffect(() => {
-    const loadAllInstallations = async () => {
-      if (!socketClient || allInstallationsLoaded) return;
-      
-      try {
-        console.log('🔧 Ladataan kaikki asennustavat muistiin...');
-        const response = await socketClient.getAllProductInstallations();
-        
-        if (response && response.success && Array.isArray(response.data)) {
-          setAllInstallations(response.data);
-          setAllInstallationsLoaded(true);
-          console.log(`✅ Ladattu ${response.data.length} asennustapaa muistiin`);
-        } else {
-          console.error('❌ Kaikkien asennustapojen lataus epäonnistui:', response);
-        }
-      } catch (error) {
-        console.error('Kaikkien asennustapojen lataus epäonnistui:', error);
-      }
-    };
-
-    loadAllInstallations();
-  }, [socketClient, allInstallationsLoaded]);
-
-  // Päivittää kaikki asennustavat uudelleen (esim. lisäyksen/poiston jälkeen)
-  const refreshAllInstallations = useCallback(async () => {
-    if (!socketClient) return;
-    
-    try {
-      console.log('🔄 Päivitetään kaikki asennustavat...');
-      const response = await socketClient.getAllProductInstallations();
-      
-      if (response && response.success && Array.isArray(response.data)) {
-        setAllInstallations(response.data);
-        console.log(`✅ Päivitetty ${response.data.length} asennustapaa muistiin`);
-      }
-    } catch (error) {
-      console.error('Asennustapojen päivitys epäonnistui:', error);
-    }
-  }, [socketClient]);
-
   // Reagoi suodattimien muutoksiin - käynnistä uusi haku
   useEffect(() => {
     if (hasSearched) {
@@ -437,13 +419,6 @@ export const ProductsPage = () => {
     });
   };
 
-  const handleCreatePackage = (product: ProductSearchResult) => {
-    setPackageModal({
-      isOpen: true,
-      product
-    });
-  };
-
   const handleInstallationModalClose = () => {
     setInstallationModal({
       isOpen: false,
@@ -473,10 +448,8 @@ export const ProductsPage = () => {
       });
 
       if (response?.success) {
+        // TODO: Näytä onnistumisviesti
         console.log('Asennustapa tallennettu onnistuneesti!');
-        // Päivitä sekä tuotekohtaiset että kaikki asennustavat
-        await refreshAllInstallations();
-        await loadProductInstallations(installationModal.product);
       } else {
         throw new Error(response?.error || 'Tallentaminen epäonnistui');
       }
@@ -487,62 +460,6 @@ export const ProductsPage = () => {
       alert(`Virhe: ${error instanceof Error ? error.message : 'Tuntematon virhe'}`);
     }
   };
-
-  const handlePackageModalClose = () => {
-    setPackageModal({
-      isOpen: false,
-      product: null
-    });
-  };
-
-  const handlePackageSave = async (packageData: {
-    description: string;
-    notes?: string;
-  }) => {
-    try {
-      if (!packageModal.product) return;
-
-      console.log('Tallentaa paketti:', {
-        product: packageModal.product.product_code,
-        ...packageData
-      });
-
-      const response = await socketClient?.createPackage({
-        package_name: packageData.description,
-        description: packageData.notes,
-        product_line: packageModal.product.product_line,
-        product_code: packageModal.product.product_code
-      });
-
-      if (response?.success) {
-        console.log('Paketti tallennettu onnistuneesti!');
-        alert('Paketti luotu onnistuneesti!');
-        handlePackageModalClose();
-      } else {
-        throw new Error(response?.error || 'Tallentaminen epäonnistui');
-      }
-      
-    } catch (error) {
-      console.error('Paketin tallennus epäonnistui:', error);
-      alert(`Virhe: ${error instanceof Error ? error.message : 'Tuntematon virhe'}`);
-    }
-  };
-
-  // Tarkistaa onko tuotteella asennustapoja muistista ladatusta datasta
-  const productHasInstallations = useCallback((product: ProductSearchResult): boolean => {
-    return allInstallations.some(installation => 
-      installation.product_line === product.product_line && 
-      installation.product_code === product.product_code
-    );
-  }, [allInstallations]);
-
-  // Laskee tuotteen asennustapojen määrän muistista ladatusta datasta
-  const getProductInstallationCount = useCallback((product: ProductSearchResult): number => {
-    return allInstallations.filter(installation => 
-      installation.product_line === product.product_line && 
-      installation.product_code === product.product_code
-    ).length;
-  }, [allInstallations]);
 
   // Rivien avaaminen/sulkeminen asennustapojen näyttämiseksi
   const toggleRowExpansion = async (product: ProductSearchResult) => {
@@ -602,11 +519,9 @@ export const ProductsPage = () => {
   // Lisää asennustapa tuotteelle
   const addInstallationMethod = (product: ProductSearchResult) => {
     console.log('➕ Avataan asennustapa-modal tuotteelle:', product.product_code);
-    setInstallationModal({
-      isOpen: true,
-      product: product
-    });
-    console.log('📱 Modal state:', { installationModal: { isOpen: true, product } });
+    setEditingProduct(product);
+    setShowInstallationModal(true);
+    console.log('📱 Modal state:', { showInstallationModal: true, editingProduct: product });
   };
 
   // Poista asennustapa tuotteelta
@@ -630,8 +545,7 @@ export const ProductsPage = () => {
 
       if (response && (response as { success: boolean }).success) {
         console.log('✅ Asennustapa poistettu onnistuneesti');
-        // Päivitä sekä tuotekohtaiset että kaikki asennustavat
-        await refreshAllInstallations();
+        // Päivitä asennustavat
         await loadProductInstallations(product);
       } else {
         console.error('❌ Asennustavan poisto epäonnistui:', response);
@@ -643,44 +557,23 @@ export const ProductsPage = () => {
     }
   };
 
-  // Käsittelee sarakkeen klikkauksen järjestämistä varten
-  const handleColumnClick = (columnName: string) => {
-    if (sortBy === columnName) {
-      // Jos sama sarake, vaihda järjestyssuunta
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      // Jos eri sarake, aseta uusi sarake ja nouseva järjestys
-      setSortBy(columnName);
-      setSortOrder('asc');
-    }
-  };
-
   // Tuotteet järjestettyinä - kaikki haku ja suodatus tapahtuu palvelimella
   const filteredProducts = useMemo(() => {
     return [...products].sort((a, b) => {
-      let comparison = 0;
-      
       switch (sortBy) {
         case 'general_name':
-          comparison = (a.general_name || '').localeCompare(b.general_name || '');
-          break;
+          return (a.general_name || '').localeCompare(b.general_name || '');
         case 'product_code':
-          comparison = a.product_code.localeCompare(b.product_code);
-          break;
+          return a.product_code.localeCompare(b.product_code);
         case 'supplier_name':
-          comparison = a.supplier_name.localeCompare(b.supplier_name);
-          break;
+          return a.supplier_name.localeCompare(b.supplier_name);
         case 'manufacturer':
-          comparison = (a.manufacturer || '').localeCompare(b.manufacturer || '');
-          break;
+          return (a.manufacturer || '').localeCompare(b.manufacturer || '');
         default:
-          comparison = 0;
+          return 0;
       }
-      
-      // Käännetään järjestys jos laskeva
-      return sortOrder === 'desc' ? -comparison : comparison;
     });
-  }, [products, sortBy, sortOrder]);
+  }, [products, sortBy]);
 
   // POISTETTU: Automaattinen asennustapojen lataus kaikille tuotteille
   // Tämä aiheutti liikaa tietokantayhteyksiä ja kaatoi järjestelmän
@@ -806,7 +699,33 @@ export const ProductsPage = () => {
       </div> {/* search-card */}
       </div> {/* search-section */}
 
-      {/* Järjestämisvalikon siirretty otsikkoriville - klikkaa sarakkeita järjestääksesi */}
+      {/* Selaussuodattimet - näytetään vain selailutilassa */}
+      {!hasSearched && (
+        <div className="products-controls">
+          <div className="control-group">
+            <label htmlFor="sort">Järjestä:</label>
+            <select
+              id="sort"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="form-control"
+            >
+              <option value="general_name">Tuotenimi</option>
+              <option value="product_code">Tuotekoodi</option>
+              <option value="supplier_name">Toimittaja</option>
+              <option value="manufacturer">Valmistaja</option>
+            </select>
+          </div>
+
+          <button
+            onClick={() => loadProducts()}
+            className="btn btn-secondary refresh-btn"
+            disabled={loading}
+          >
+            🔄 Päivitä
+          </button>
+        </div>
+      )}
 
       {/* Virhe-ilmoitus */}
       {error && (
@@ -847,47 +766,11 @@ export const ProductsPage = () => {
           {/* Kiinteät otsikot */}
           <div className="table-header">
             <div className="header-row">
-              <div 
-                className={`header-cell product-number-col sortable ${sortBy === 'product_code' ? 'active' : ''}`}
-                onClick={() => handleColumnClick('product_code')}
-                title={sortBy === 'product_code' 
-                  ? `Klikkaa vaihtaaksesi järjestyksen (nyt ${sortOrder === 'asc' ? 'nouseva' : 'laskeva'})`
-                  : "Klikkaa järjestääksesi tuotekoodin mukaan"
-                }
-              >
-                Tuotenumero {sortBy === 'product_code' && (sortOrder === 'asc' ? '↑' : '↓')}
-              </div>
-              <div 
-                className={`header-cell product-name-col sortable ${sortBy === 'general_name' ? 'active' : ''}`}
-                onClick={() => handleColumnClick('general_name')}
-                title={sortBy === 'general_name' 
-                  ? `Klikkaa vaihtaaksesi järjestyksen (nyt ${sortOrder === 'asc' ? 'nouseva' : 'laskeva'})`
-                  : "Klikkaa järjestääksesi nimen mukaan"
-                }
-              >
-                Nimi {sortBy === 'general_name' && (sortOrder === 'asc' ? '↑' : '↓')}
-              </div>
+              <div className="header-cell product-number-col">Tuotenumero</div>
+              <div className="header-cell product-name-col">Nimi</div>
               <div className="header-cell technical-name-col">Tekninen nimi</div>
-              <div 
-                className={`header-cell supplier-col sortable ${sortBy === 'supplier_name' ? 'active' : ''}`}
-                onClick={() => handleColumnClick('supplier_name')}
-                title={sortBy === 'supplier_name' 
-                  ? `Klikkaa vaihtaaksesi järjestyksen (nyt ${sortOrder === 'asc' ? 'nouseva' : 'laskeva'})`
-                  : "Klikkaa järjestääksesi toimittajan mukaan"
-                }
-              >
-                Toimittaja {sortBy === 'supplier_name' && (sortOrder === 'asc' ? '↑' : '↓')}
-              </div>
-              <div 
-                className={`header-cell manufacturer-col sortable ${sortBy === 'manufacturer' ? 'active' : ''}`}
-                onClick={() => handleColumnClick('manufacturer')}
-                title={sortBy === 'manufacturer' 
-                  ? `Klikkaa vaihtaaksesi järjestyksen (nyt ${sortOrder === 'asc' ? 'nouseva' : 'laskeva'})`
-                  : "Klikkaa järjestääksesi valmistajan mukaan"
-                }
-              >
-                Valmistaja {sortBy === 'manufacturer' && (sortOrder === 'asc' ? '↑' : '↓')}
-              </div>
+              <div className="header-cell supplier-col">Toimittaja</div>
+              <div className="header-cell manufacturer-col">Valmistaja</div>
               <div className="header-cell unit-col">Yksikkö</div>
               <div className="header-cell status-col">Aktiivinen</div>
             </div>
@@ -903,9 +786,8 @@ export const ProductsPage = () => {
               const productKey = `${product.product_line}-${product.product_code}`;
               const isExpanded = expandedRows.has(productKey);
               const installations = installationData[productKey] || [];
-              // Käytetään muistista ladattua dataa visuaalisiin indikaattoreihin
-              const hasInstallations = productHasInstallations(product);
-              const installationCount = getProductInstallationCount(product);
+              // VÄLIAIKAISESTI POISTETTU: visuaaliset indikaattorit asennustavoille
+              // const hasInstallations = installations.length > 0;
               
               return (
                 <Fragment key={productKey}>
@@ -916,15 +798,17 @@ export const ProductsPage = () => {
                     <div className="product-cell product-number-col">
                       <div className="expand-btn-container">
                         <button
-                          className={`expand-btn ${isExpanded ? 'expanded' : ''} ${hasInstallations ? 'has-installations' : ''}`}
+                          className={`expand-btn ${isExpanded ? 'expanded' : ''}`}
                           onClick={() => toggleRowExpansion(product)}
-                          title={hasInstallations ? `Näytä asennustavat (${installationCount} kpl)` : "Näytä asennustavat"}
+                          title="Näytä asennustavat"
                         >
                           {isExpanded ? '▼' : '▶'}
                         </button>
+                        {/* VÄLIAIKAISESTI POISTETTU: asennustapojen lukumäärä-badge
                         {hasInstallations && (
-                          <span className="installations-count">{installationCount}</span>
+                          <span className="installations-count">{installations.length}</span>
                         )}
+                        */}
                       </div>
                       <div className="product-number-content">
                         <span className="product-line">{product.product_line}</span>
@@ -1036,7 +920,6 @@ export const ProductsPage = () => {
           product={contextMenu.product}
           onClose={handleContextMenuClose}
           onAddInstallationMethod={handleAddInstallationMethod}
-          onCreatePackage={handleCreatePackage}
         />
       )}
 
@@ -1050,19 +933,61 @@ export const ProductsPage = () => {
           onSave={handleInstallationSave}
         />
       )}
-
-      {/* Package Modal */}
-      {packageModal.product && (
-        <PackageModal
-          isOpen={packageModal.isOpen}
-          product={packageModal.product}
-          onClose={handlePackageModalClose}
-          onSave={handlePackageSave}
-        />
-      )}
             
       </div> {/* container-fluid */}
     </div> {/* products-page */}
+      {/* Installation Method Modal */}
+      {(() => {
+        console.log('🔍 Modal render check:', { 
+          showInstallationModal, 
+          editingProduct: !!editingProduct, 
+          socketClient: !!socketClient 
+        });
+        return null;
+      })()}
+      {showInstallationModal && editingProduct && socketClient && (
+        <InstallationMethodModal
+          isOpen={showInstallationModal}
+          onClose={() => {
+            console.log('❌ Suljetaan asennustapa-modal');
+            setShowInstallationModal(false);
+            setEditingProduct(null);
+          }}
+          onSave={async (installationData) => {
+            console.log('💾 Tallennetaan asennustapa:', installationData);
+            try {
+              const response = await socketClient.apiRequest('add_product_installation', {
+                productLine: editingProduct.product_line,
+                productCode: editingProduct.product_code,
+                methodCode: installationData.methodCode,
+                standardHours: installationData.standardHours,
+                notes: installationData.notes
+              });
+
+              console.log('📦 Tallennusvastaus:', response);
+
+              if (response && (response as { success: boolean }).success) {
+                console.log('✅ Asennustapa tallennettu onnistuneesti');
+                // Päivitä asennustavat kun tallennus on valmis
+                await loadProductInstallations(editingProduct);
+              } else {
+                console.error('❌ Asennustavan tallennus epäonnistui:', response);
+                alert('Asennustavan tallennus epäonnistui');
+                return; // Älä sulje modaalia jos tallennus epäonnistui
+              }
+            } catch (error) {
+              console.error('Asennustavan tallennus epäonnistui:', error);
+              alert('Asennustavan tallennus epäonnistui: ' + (error as Error).message);
+              return; // Älä sulje modaalia jos tallennus epäonnistui
+            }
+
+            setShowInstallationModal(false);
+            setEditingProduct(null);
+          }}
+          product={editingProduct}
+          socketClient={socketClient}
+        />
+      )}
     </div>
   );
 };

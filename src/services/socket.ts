@@ -315,6 +315,16 @@ export class SocketClient {
     }>>>;
   }
 
+  // Luo paketti tuotteesta
+  public async createPackage(params: {
+    package_name: string;
+    description?: string;
+    product_line: string;
+    product_code: string;
+  }): Promise<ApiResponse<{ success: boolean; package_id?: string }>> {
+    return this.apiRequest('create_package', params) as Promise<ApiResponse<{ success: boolean; package_id?: string }>>;
+  }
+
   // Utility method for periodic ping to keep connection alive
   public startHeartbeat(interval: number = 30000): number {
     return window.setInterval(() => {

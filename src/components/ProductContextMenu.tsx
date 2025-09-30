@@ -8,6 +8,7 @@ interface ProductContextMenuProps {
   product: ProductSearchResult;
   onClose: () => void;
   onAddInstallationMethod: (product: ProductSearchResult) => void;
+  onCreatePackage: (product: ProductSearchResult) => void;
 }
 
 export const ProductContextMenu: React.FC<ProductContextMenuProps> = ({
@@ -15,7 +16,8 @@ export const ProductContextMenu: React.FC<ProductContextMenuProps> = ({
   y,
   product,
   onClose,
-  onAddInstallationMethod
+  onAddInstallationMethod,
+  onCreatePackage
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -46,6 +48,11 @@ export const ProductContextMenu: React.FC<ProductContextMenuProps> = ({
     onClose();
   };
 
+  const handleCreatePackage = () => {
+    onCreatePackage(product);
+    onClose();
+  };
+
   return (
     <div
       ref={menuRef}
@@ -64,6 +71,14 @@ export const ProductContextMenu: React.FC<ProductContextMenuProps> = ({
       </div>
       
       <div className="context-menu-actions">
+        <button 
+          className="context-menu-item"
+          onClick={handleCreatePackage}
+        >
+          <span className="icon">📦</span>
+          Luo paketti
+        </button>
+        
         <button 
           className="context-menu-item"
           onClick={handleAddInstallation}
