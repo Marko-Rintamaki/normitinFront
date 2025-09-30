@@ -448,7 +448,8 @@ export const ProductsPage = () => {
     setDisplayedCount(ITEMS_PER_LOAD);
   }, [searchQuery, searchFilters, ITEMS_PER_LOAD]);
 
-  if (loading && products.length === 0) {
+  // Näytä loading vain alussa kun ei ole vielä haettu mitään
+  if (loading && products.length === 0 && !hasSearched) {
     return (
       <div className="products-page">
         <div className="page-header">
