@@ -297,6 +297,24 @@ export class SocketClient {
     }>>>;
   }
 
+  public async getAllProductInstallations(): Promise<ApiResponse<Array<{
+    product_line: string;
+    product_code: string;
+    method_code: number;
+    standard_hours: number;
+    method_name: string;
+    method_description?: string;
+  }>>> {
+    return this.apiRequest('get_all_product_installations', {}) as Promise<ApiResponse<Array<{
+      product_line: string;
+      product_code: string;
+      method_code: number;
+      standard_hours: number;
+      method_name: string;
+      method_description?: string;
+    }>>>;
+  }
+
   // Utility method for periodic ping to keep connection alive
   public startHeartbeat(interval: number = 30000): number {
     return window.setInterval(() => {

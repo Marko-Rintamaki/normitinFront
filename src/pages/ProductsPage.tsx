@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, memo, Fragment } from 'react';
 import { useSocket } from '../context/SocketContext';
 import { ProductContextMenu } from '../components/ProductContextMenu';
 import { InstallationMethodModal } from '../components/InstallationMethodModal';
@@ -93,6 +93,35 @@ export const ProductsPage = () => {
     isOpen: false,
     product: null
   });
+  
+  // Expanded rivien hallinta asennustapojen näyttämiseksi
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [installationData, setInstallationData] = useState<{
+    [key: string]: Array<{
+      product_line: string;
+      product_code: string;
+      method_code: number;
+      standard_hours: string;
+      is_default: boolean;
+      method_name: string;
+      method_description?: string;
+    }>;
+  }>({});
+
+  // Kaikki asennustavat ladattu muistiin kerran
+  const [allInstallationsLoaded, setAllInstallationsLoaded] = useState(false);
+  const [allInstallations, setAllInstallations] = useState<Array<{
+    product_line: string;
+    product_code: string;
+    method_code: number;
+    standard_hours: number;
+    method_name: string;
+    method_description?: string;
+  }>>([]);
+
+  // Asennustapojen lisäys/muokkaus
+  const [showInstallationModal, setShowInstallationModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<ProductSearchResult | null>(null);
   
   // Ladataan toimittajavalinnat localStoragesta
   const loadSavedSuppliers = (): string[] => {
@@ -242,6 +271,47 @@ export const ProductsPage = () => {
     loadProductLines();
   }, [loadProducts, loadSuppliers, loadProductLines, hasSearched]);
 
+  // Lataa kaikki asennustavat muistiin kerran sovelluksen käynnistyessä
+  useEffect(() => {
+    const loadAllInstallations = async () => {
+      if (!socketClient || allInstallationsLoaded) return;
+      
+      try {
+        console.log('🔧 Ladataan kaikki asennustavat muistiin...');
+        const response = await socketClient.getAllProductInstallations();
+        
+        if (response && response.success && Array.isArray(response.data)) {
+          setAllInstallations(response.data);
+          setAllInstallationsLoaded(true);
+          console.log(`✅ Ladattu ${response.data.length} asennustapaa muistiin`);
+        } else {
+          console.error('❌ Kaikkien asennustapojen lataus epäonnistui:', response);
+        }
+      } catch (error) {
+        console.error('Kaikkien asennustapojen lataus epäonnistui:', error);
+      }
+    };
+
+    loadAllInstallations();
+  }, [socketClient, allInstallationsLoaded]);
+
+  // Päivittää kaikki asennustavat uudelleen (esim. lisäyksen/poiston jälkeen)
+  const refreshAllInstallations = useCallback(async () => {
+    if (!socketClient) return;
+    
+    try {
+      console.log('🔄 Päivitetään kaikki asennustavat...');
+      const response = await socketClient.getAllProductInstallations();
+      
+      if (response && response.success && Array.isArray(response.data)) {
+        setAllInstallations(response.data);
+        console.log(`✅ Päivitetty ${response.data.length} asennustapaa muistiin`);
+      }
+    } catch (error) {
+      console.error('Asennustapojen päivitys epäonnistui:', error);
+    }
+  }, [socketClient]);
+
   // Reagoi suodattimien muutoksiin - käynnistä uusi haku
   useEffect(() => {
     if (hasSearched) {
@@ -390,8 +460,10 @@ export const ProductsPage = () => {
       });
 
       if (response?.success) {
-        // TODO: Näytä onnistumisviesti
         console.log('Asennustapa tallennettu onnistuneesti!');
+        // Päivitä sekä tuotekohtaiset että kaikki asennustavat
+        await refreshAllInstallations();
+        await loadProductInstallations(installationModal.product);
       } else {
         throw new Error(response?.error || 'Tallentaminen epäonnistui');
       }
@@ -400,6 +472,119 @@ export const ProductsPage = () => {
       console.error('Asennustavan tallennus epäonnistui:', error);
       // TODO: Näytä virheilmoitus käyttäjälle
       alert(`Virhe: ${error instanceof Error ? error.message : 'Tuntematon virhe'}`);
+    }
+  };
+
+  // Tarkistaa onko tuotteella asennustapoja muistista ladatusta datasta
+  const productHasInstallations = useCallback((product: ProductSearchResult): boolean => {
+    return allInstallations.some(installation => 
+      installation.product_line === product.product_line && 
+      installation.product_code === product.product_code
+    );
+  }, [allInstallations]);
+
+  // Laskee tuotteen asennustapojen määrän muistista ladatusta datasta
+  const getProductInstallationCount = useCallback((product: ProductSearchResult): number => {
+    return allInstallations.filter(installation => 
+      installation.product_line === product.product_line && 
+      installation.product_code === product.product_code
+    ).length;
+  }, [allInstallations]);
+
+  // Rivien avaaminen/sulkeminen asennustapojen näyttämiseksi
+  const toggleRowExpansion = async (product: ProductSearchResult) => {
+    const productKey = `${product.product_line}-${product.product_code}`;
+    const newExpandedRows = new Set(expandedRows);
+    
+    if (expandedRows.has(productKey)) {
+      // Suljetaan rivi
+      newExpandedRows.delete(productKey);
+      setExpandedRows(newExpandedRows);
+    } else {
+      // Avataan rivi ja ladataan asennustavat
+      newExpandedRows.add(productKey);
+      setExpandedRows(newExpandedRows);
+      await loadProductInstallations(product);
+    }
+  };
+
+  // Lataa tuotteen asennustavat
+  const loadProductInstallations = useCallback(async (product: ProductSearchResult) => {
+    if (!socketClient) return;
+
+    try {
+      console.log('🔧 Haetaan asennustavat tuotteelle:', product.product_code, product.product_line);
+      
+      const response = await socketClient.getProductInstallations({
+        productCode: product.product_code,
+        productLine: product.product_line
+      });
+
+      console.log('📦 API vastaus asennustavoille:', response);
+
+      if (response.success && response.data) {
+        const productKey = `${product.product_line}-${product.product_code}`;
+        console.log('✅ Tallennetaan asennustavat avaimelle:', productKey, 'data:', response.data);
+        console.log('🔍 Ensimmäinen asennustapa:', response.data[0]);
+        setInstallationData(prev => ({
+          ...prev,
+          [productKey]: (response.data || []) as unknown as Array<{
+            product_line: string;
+            product_code: string;
+            method_code: number;
+            standard_hours: string;
+            is_default: boolean;
+            method_name: string;
+            method_description?: string;
+          }>
+        }));
+      } else {
+        console.log('❌ API vastaus ei sisältänyt dataa tai ei onnistunut:', response);
+      }
+    } catch (error) {
+      console.error('Asennustapojen lataus epäonnistui:', error);
+    }
+  }, [socketClient]);
+
+  // Lisää asennustapa tuotteelle
+  const addInstallationMethod = (product: ProductSearchResult) => {
+    console.log('➕ Avataan asennustapa-modal tuotteelle:', product.product_code);
+    setEditingProduct(product);
+    setShowInstallationModal(true);
+    console.log('📱 Modal state:', { showInstallationModal: true, editingProduct: product });
+  };
+
+  // Poista asennustapa tuotteelta
+  const removeInstallationMethod = async (product: ProductSearchResult, methodCode: number) => {
+    if (!socketClient) return;
+
+    if (!confirm('Haluatko varmasti poistaa tämän asennustavan?')) {
+      return;
+    }
+
+    try {
+      console.log('🗑️ Poistetaan asennustapa:', product.product_line, product.product_code, methodCode);
+      
+      const response = await socketClient.apiRequest('remove_product_installation', {
+        productLine: product.product_line,
+        productCode: product.product_code,
+        methodCode: methodCode
+      });
+
+      console.log('📦 Poisto-vastaus:', response);
+
+      if (response && (response as { success: boolean }).success) {
+        console.log('✅ Asennustapa poistettu onnistuneesti');
+        // Päivitä sekä tuotekohtaiset että kaikki asennustavat
+        await refreshAllInstallations();
+        await loadProductInstallations(product);
+      } else {
+        console.error('❌ Asennustavan poisto epäonnistui:', response);
+        alert('Asennustavan poisto epäonnistui');
+      }
+    } catch (error) {
+      console.error('Asennustavan poisto epäonnistui:', error);
+      alert('Asennustavan poisto epäonnistui: ' + (error as Error).message);
     }
   };
 
@@ -420,6 +605,9 @@ export const ProductsPage = () => {
       }
     });
   }, [products, sortBy]);
+
+  // POISTETTU: Automaattinen asennustapojen lataus kaikille tuotteille
+  // Tämä aiheutti liikaa tietokantayhteyksiä ja kaatoi järjestelmän
 
   // Virtualisointi - näytetään vain tietty määrä tuotteita
   const visibleProducts = useMemo(() => {
@@ -625,39 +813,114 @@ export const ProductsPage = () => {
             ref={tableBodyRef}
             onScroll={handleScroll}
           >
-            {visibleProducts.map((product) => (
-              <div 
-                key={`${product.product_line}-${product.product_code}`} 
-                className="product-row"
-                onContextMenu={(e) => handleProductRightClick(e, product)}
-                style={{ cursor: 'context-menu' }}
-              >
-                <div className="product-cell product-number-col">
-                  <span className="product-line">{product.product_line}</span>
-                  <span className="product-code">{product.product_code}</span>
-                </div>
-                <div className="product-cell product-name-col">
-                  {product.general_name || '-'}
-                </div>
-                <div className="product-cell technical-name-col">
-                  {product.technical_name || '-'}
-                </div>
-                <div className="product-cell supplier-col">
-                  {product.supplier_name}
-                </div>
-                <div className="product-cell manufacturer-col">
-                  {product.manufacturer || '-'}
-                </div>
-                <div className="product-cell unit-col">
-                  {product.unit || '-'}
-                </div>
-                <div className="product-cell status-col">
-                  <span className={`status-badge ${product.active ? 'active' : 'inactive'}`}>
-                    {product.active ? 'Kyllä' : 'Ei'}
-                  </span>
-                </div>
-              </div>
-            ))}
+            {visibleProducts.map((product) => {
+              const productKey = `${product.product_line}-${product.product_code}`;
+              const isExpanded = expandedRows.has(productKey);
+              const installations = installationData[productKey] || [];
+              // Käytetään muistista ladattua dataa visuaalisiin indikaattoreihin
+              const hasInstallations = productHasInstallations(product);
+              const installationCount = getProductInstallationCount(product);
+              
+              return (
+                <Fragment key={productKey}>
+                  <div 
+                    className="product-row"
+                    onContextMenu={(e) => handleProductRightClick(e, product)}
+                  >
+                    <div className="product-cell product-number-col">
+                      <div className="expand-btn-container">
+                        <button
+                          className={`expand-btn ${isExpanded ? 'expanded' : ''} ${hasInstallations ? 'has-installations' : ''}`}
+                          onClick={() => toggleRowExpansion(product)}
+                          title={hasInstallations ? `Näytä asennustavat (${installationCount} kpl)` : "Näytä asennustavat"}
+                        >
+                          {isExpanded ? '▼' : '▶'}
+                        </button>
+                        {hasInstallations && (
+                          <span className="installations-count">{installationCount}</span>
+                        )}
+                      </div>
+                      <div className="product-number-content">
+                        <span className="product-line">{product.product_line}</span>
+                        <span className="product-code">{product.product_code}</span>
+                      </div>
+                    </div>
+                    <div className="product-cell product-name-col">
+                      {product.general_name || '-'}
+                    </div>
+                    <div className="product-cell technical-name-col">
+                      {product.technical_name || '-'}
+                    </div>
+                    <div className="product-cell supplier-col">
+                      {product.supplier_name}
+                    </div>
+                    <div className="product-cell manufacturer-col">
+                      {product.manufacturer || '-'}
+                    </div>
+                    <div className="product-cell unit-col">
+                      {product.unit || '-'}
+                    </div>
+                    <div className="product-cell status-col">
+                      <span className={`status-badge ${product.active ? 'active' : 'inactive'}`}>
+                        {product.active ? 'Kyllä' : 'Ei'}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {/* Asennustavat-rivi */}
+                  {isExpanded && (
+                    <div className="product-installations-row">
+                      <div className="installations-content">
+                        <div className="installations-header">
+                          <h4>Asennustavat tuotteelle {product.product_code}:</h4>
+                          <button
+                            className="add-installation-btn"
+                            onClick={() => addInstallationMethod(product)}
+                            title="Lisää asennustapa"
+                          >
+                            + Lisää asennustapa
+                          </button>
+                        </div>
+                        {(() => {
+                          console.log('🎨 Renderöidään asennustavat tuotteelle:', productKey, 'installations:', installations);
+                          return null;
+                        })()}
+                        {installations.length > 0 ? (
+                          <div className="installations-list">
+                            {installations.map((installation) => (
+                              <div key={installation.method_code} className="installation-item">
+                                <span className="installation-method">{installation.method_name}</span>
+                                <span className="installation-time">{installation.standard_hours}h</span>
+                                {installation.method_description && (
+                                  <span className="installation-notes">{installation.method_description}</span>
+                                )}
+                                <button
+                                  className="remove-installation-btn"
+                                  onClick={() => removeInstallationMethod(product, installation.method_code)}
+                                  title="Poista asennustapa"
+                                >
+                                  🗑️
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="no-installations-wrapper">
+                            <p className="no-installations">Ei asennustapoja määritelty</p>
+                            <button
+                              className="add-first-installation-btn"
+                              onClick={() => addInstallationMethod(product)}
+                            >
+                              Lisää ensimmäinen asennustapa
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </Fragment>
+              );
+            })}
             
             {/* Loading indicator */}
             {isLoadingMore && (
@@ -703,6 +966,58 @@ export const ProductsPage = () => {
             
       </div> {/* container-fluid */}
     </div> {/* products-page */}
+      {/* Installation Method Modal */}
+      {(() => {
+        console.log('🔍 Modal render check:', { 
+          showInstallationModal, 
+          editingProduct: !!editingProduct, 
+          socketClient: !!socketClient 
+        });
+        return null;
+      })()}
+      {showInstallationModal && editingProduct && socketClient && (
+        <InstallationMethodModal
+          isOpen={showInstallationModal}
+          onClose={() => {
+            console.log('❌ Suljetaan asennustapa-modal');
+            setShowInstallationModal(false);
+            setEditingProduct(null);
+          }}
+          onSave={async (installationData) => {
+            console.log('💾 Tallennetaan asennustapa:', installationData);
+            try {
+              const response = await socketClient.apiRequest('add_product_installation', {
+                productLine: editingProduct.product_line,
+                productCode: editingProduct.product_code,
+                methodCode: installationData.methodCode,
+                standardHours: installationData.standardHours,
+                notes: installationData.notes
+              });
+
+              console.log('📦 Tallennusvastaus:', response);
+
+              if (response && (response as { success: boolean }).success) {
+                console.log('✅ Asennustapa tallennettu onnistuneesti');
+                // Päivitä asennustavat kun tallennus on valmis
+                await loadProductInstallations(editingProduct);
+              } else {
+                console.error('❌ Asennustavan tallennus epäonnistui:', response);
+                alert('Asennustavan tallennus epäonnistui');
+                return; // Älä sulje modaalia jos tallennus epäonnistui
+              }
+            } catch (error) {
+              console.error('Asennustavan tallennus epäonnistui:', error);
+              alert('Asennustavan tallennus epäonnistui: ' + (error as Error).message);
+              return; // Älä sulje modaalia jos tallennus epäonnistui
+            }
+
+            setShowInstallationModal(false);
+            setEditingProduct(null);
+          }}
+          product={editingProduct}
+          socketClient={socketClient}
+        />
+      )}
     </div>
   );
 };

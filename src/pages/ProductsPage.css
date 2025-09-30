@@ -466,7 +466,7 @@
 
 .header-row {
   display: grid;
-  grid-template-columns: 150px 1fr 1fr 150px 150px 100px 120px;
+  grid-template-columns: 200px 1fr 1fr 150px 150px 100px 120px;
   gap: 1px;
   min-height: 50px;
 }
@@ -527,7 +527,7 @@
 /* Tuoterivit */
 .product-row {
   display: grid;
-  grid-template-columns: 150px 1fr 1fr 150px 150px 100px 120px;
+  grid-template-columns: 200px 1fr 1fr 150px 150px 100px 120px;
   gap: 1px;
   min-height: 60px;
   border-bottom: 1px solid var(--bs-gray-200);
@@ -805,4 +805,220 @@
   .filters-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* Status-sarake ja expand-nappi */
+.product-number-col {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.product-number-content {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.expand-btn-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.installations-count {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  background-color: #4CAF50;
+  color: white;
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  font-size: 10px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  border: 2px solid white;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+.expand-btn {
+  background: none;
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 4px;
+  color: #666;
+  transition: all 0.2s ease;
+  min-width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.expand-btn:hover {
+  background-color: #f5f5f5;
+  color: #333;
+}
+
+.expand-btn.expanded {
+  color: #4CAF50;
+}
+
+.expand-btn.has-installations {
+  color: #4CAF50;
+  font-weight: bold;
+}
+
+.expand-btn.has-installations:hover {
+  background-color: #e8f5e8;
+  color: #2E7D32;
+}
+
+.status-col {
+  display: flex;
+  align-items: center;
+}
+
+/* Asennustavat-rivi */
+.product-installations-row {
+  grid-column: 1 / -1;
+  background-color: #f9f9f9;
+  border-left: 3px solid #4CAF50;
+  padding: 15px 20px;
+  margin: 0 10px 5px 10px;
+  border-radius: 0 5px 5px 0;
+}
+
+.installations-content h4 {
+  margin: 0 0 10px 0;
+  color: #333;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.installations-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.installations-header h4 {
+  margin: 0;
+}
+
+.add-installation-btn {
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.add-installation-btn:hover {
+  background-color: #45a049;
+}
+
+.installation-item {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 8px 12px;
+  background-color: white;
+  border-radius: 4px;
+  border: 1px solid #e0e0e0;
+}
+
+.remove-installation-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 3px;
+  font-size: 14px;
+  margin-left: auto;
+  transition: background-color 0.2s ease;
+}
+
+.remove-installation-btn:hover {
+  background-color: #ffebee;
+}
+
+.no-installations-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 20px;
+}
+
+.add-first-installation-btn {
+  background-color: #2196F3;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background-color 0.2s ease;
+}
+
+.add-first-installation-btn:hover {
+  background-color: #1976D2;
+}
+
+.installations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.installation-item {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 8px 12px;
+  background-color: white;
+  border-radius: 4px;
+  border: 1px solid #e0e0e0;
+}
+
+.installation-method {
+  font-weight: 500;
+  color: #333;
+  min-width: 200px;
+}
+
+.installation-time {
+  color: #666;
+  font-family: monospace;
+  background-color: #f5f5f5;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+.installation-notes {
+  color: #888;
+  font-style: italic;
+  font-size: 13px;
+}
+
+.no-installations {
+  color: #999;
+  font-style: italic;
+  margin: 0;
+  padding: 10px;
+  text-align: center;
 }
