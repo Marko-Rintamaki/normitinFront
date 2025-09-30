@@ -1,65 +1,151 @@
+/* Products Page - Musta + kulta teema & koko sivu */
 .products-page {
-  max-width: 1200px;
-  margin: 0 auto;
+  width: 100%;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  padding: var(--spacing-lg) 0;
 }
 
-.page-header {
+/* Search Section */
+.search-section {
+  margin-bottom: var(--spacing-2xl);
+}
+
+.search-card {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-xl);
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--bs-gray-300);
+}
+
+.search-header {
   text-align: center;
-  margin-bottom: 2rem;
-  padding: 2rem 0;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-  border-radius: 12px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  margin-bottom: var(--spacing-xl);
+  padding-bottom: var(--spacing-lg);
+  border-bottom: 2px solid var(--primary-color);
 }
 
-.page-header h1 {
-  font-size: 2.5rem;
-  color: #2c3e50;
-  margin-bottom: 0.5rem;
+.search-title {
+  font-size: var(--font-size-2xl);
+  color: var(--dark-color);
+  margin-bottom: var(--spacing-sm);
   font-weight: 700;
 }
 
-.page-header p {
-  font-size: 1.1rem;
-  color: #666;
+.search-subtitle {
+  font-size: var(--font-size-lg);
+  color: var(--bs-gray-600);
   margin: 0;
+  font-weight: 500;
+}
+
+.search-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  margin-bottom: var(--spacing-xl);
+}
+
+/* Suodattimet hakukortin sisällä */
+.filters-section {
+  border-top: 1px solid var(--bs-gray-300);
+  padding-top: var(--spacing-xl);
+  margin-top: var(--spacing-xl);
+}
+
+.filters-section h3 {
+  margin: 0 0 var(--spacing-lg) 0;
+  color: var(--dark-color);
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  text-align: center;
+}
+
+.search-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.search-input-group {
+  display: flex;
+  gap: var(--spacing-md);
+  align-items: stretch;
+}
+
+.search-input {
+  flex: 1;
+  padding: var(--spacing-md) var(--spacing-lg);
+  border: 2px solid var(--bs-gray-400);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-lg);
+  background: var(--white);
+  color: var(--bs-gray-900); /* Tumma teksti valkoista taustaa vasten */
+  transition: all 0.2s ease-in-out;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.2), inset 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.search-input::placeholder {
+  color: var(--bs-gray-500);
+  font-style: italic;
 }
 
 .controls {
   display: flex;
   flex-wrap: wrap;
-  gap: 1rem;
+  gap: var(--spacing-lg);
   align-items: center;
   justify-content: space-between;
-  background: white;
-  padding: 1.5rem;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  margin-bottom: 2rem;
+  background: var(--white);
+  padding: var(--spacing-xl);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  margin-bottom: var(--spacing-xl);
+  border: 1px solid var(--gray-200);
 }
 
 .filters, .sorting {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
 }
 
 .filters label, .sorting label {
   font-weight: 600;
-  color: #333;
+  color: var(--gray-700);
+  font-size: var(--font-size-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .filter-select, .sort-select {
-  padding: 0.5rem 1rem;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  background: white;
-  font-size: 0.9rem;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 2px solid var(--gray-300);
+  border-radius: var(--radius-md);
+  background: var(--white);
+  font-size: var(--font-size-base);
+  color: var(--gray-700);
+  transition: all 0.2s ease-in-out;
+  min-width: 150px;
+}
+
+.filter-select:focus, .sort-select:focus {
+  outline: none;
+  border-color: var(--primary-green);
+  box-shadow: 0 0 0 3px rgba(105, 190, 40, 0.1);
 }
 
 .refresh-button {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: linear-gradient(135deg, var(--primary-green) 0%, var(--dark-green) 100%);
+  color: var(--white);
   border: none;
   padding: 0.75rem 1.5rem;
   border-radius: 6px;
@@ -78,39 +164,70 @@
   cursor: not-allowed;
 }
 
+/* Status messages */
 .connection-error, .error-message, .loading, .no-products {
   text-align: center;
-  padding: 2rem;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  margin-bottom: 2rem;
+  padding: var(--spacing-2xl);
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  margin-bottom: var(--spacing-xl);
+  border: 1px solid var(--gray-200);
 }
 
 .error-message {
-  border-left: 4px solid #e74c3c;
-  background: linear-gradient(135deg, rgba(231, 76, 60, 0.05) 0%, rgba(231, 76, 60, 0.02) 100%);
+  border-left: 4px solid var(--error);
+  background: linear-gradient(135deg, rgba(220, 53, 69, 0.05) 0%, rgba(220, 53, 69, 0.02) 100%);
+  color: var(--error);
 }
 
 .loading {
-  border-left: 4px solid #f39c12;
-  background: linear-gradient(135deg, rgba(243, 156, 18, 0.05) 0%, rgba(243, 156, 18, 0.02) 100%);
+  border-left: 4px solid var(--primary-green);
+  background: linear-gradient(135deg, rgba(105, 190, 40, 0.05) 0%, rgba(105, 190, 40, 0.02) 100%);
+  color: var(--primary-green);
 }
 
+.no-products {
+  border-left: 4px solid var(--secondary-green);
+  background: linear-gradient(135deg, rgba(43, 127, 92, 0.05) 0%, rgba(43, 127, 92, 0.02) 100%);
+  color: var(--secondary-green);
+}
+
+/* Products grid layout - moderniksi */
 .products-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 1.5rem;
-  margin-bottom: 2rem;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: var(--spacing-xl);
+  margin-bottom: var(--spacing-2xl);
+  padding: var(--spacing-md);
 }
 
 .product-card {
-  background: white;
-  border-radius: 12px;
-  padding: 1.5rem;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-  border: 1px solid #eee;
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-xl);
+  box-shadow: var(--shadow-md);
+  transition: all 0.3s ease;
+  border: 1px solid var(--gray-200);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.product-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--primary-green) 0%, var(--secondary-green) 100%);
+  transform: scaleX(0);
+  transition: transform 0.3s ease;
+}
+
+.product-card:hover::before {
+  transform: scaleX(1);
 }
 
 .product-card:hover {
@@ -231,45 +348,179 @@
 }
 
 /* Taulukko-tyylit */
+/* Virtualisoitu tuotetaulukko */
 .products-table-container {
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--bs-gray-300);
   overflow: hidden;
+  height: 600px; /* Kiinteä korkeus */
+  display: flex;
+  flex-direction: column;
   margin-bottom: 2rem;
 }
 
-.products-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 14px;
+/* Kiinteät otsikot - padding-right säädetään JS:llä scrollbarin mukaan */
+.table-header {
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+  color: var(--dark-color);
+  font-weight: 600;
+  border-bottom: 2px solid var(--bs-gray-300);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  transition: padding-right 0.2s ease;
 }
 
-.products-table th {
-  background: #f8f9fa;
-  color: #495057;
-  font-weight: 600;
-  padding: 16px 12px;
+.header-row {
+  display: grid;
+  grid-template-columns: 150px 1fr 1fr 150px 150px 100px 120px;
+  gap: 1px;
+  min-height: 50px;
+}
+
+.header-cell {
+  padding: var(--spacing-md);
+  display: flex;
+  align-items: center;
+  font-weight: 700;
   text-align: left;
-  border-bottom: 2px solid #e9ecef;
-  font-size: 13px;
+  border-right: 1px solid rgba(0, 0, 0, 0.1);
+  font-size: var(--font-size-sm);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--dark-color); /* Tumma teksti kultaista taustaa vasten */
 }
 
-.products-table td {
-  padding: 12px;
-  border-bottom: 1px solid #e9ecef;
-  vertical-align: middle;
+.header-cell:last-child {
+  border-right: none;
 }
 
-.products-table tbody tr:hover {
-  background: #f8f9fa;
-  cursor: pointer;
+/* Scrollattava sisältöalue - piilottaa scrollbarin tilan */
+.table-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--white);
 }
 
-.products-table tbody tr:last-child td {
-  border-bottom: none;
+/* Webkit-selaimille (Chrome, Safari, Edge) - piilottaa scrollbar */
+.table-body::-webkit-scrollbar {
+  width: 17px;
+  background-color: transparent;
+}
+
+.table-body::-webkit-scrollbar-track {
+  background-color: var(--bs-gray-100);
+  border-radius: 0;
+}
+
+.table-body::-webkit-scrollbar-thumb {
+  background-color: var(--bs-gray-400);
+  border-radius: 8px;
+  border: 3px solid var(--bs-gray-100);
+}
+
+.table-body::-webkit-scrollbar-thumb:hover {
+  background-color: var(--bs-gray-500);
+}
+
+/* Firefox - scrollbar styling */
+.table-body {
+  scrollbar-width: thin;
+  scrollbar-color: var(--bs-gray-400) var(--bs-gray-100);
+}
+
+/* Tuoterivit */
+.product-row {
+  display: grid;
+  grid-template-columns: 150px 1fr 1fr 150px 150px 100px 120px;
+  gap: 1px;
+  min-height: 60px;
+  border-bottom: 1px solid var(--bs-gray-200);
+  transition: background-color 0.2s ease;
+}
+
+.product-row:hover {
+  background-color: var(--bs-primary-bg-subtle);
+}
+
+.product-cell {
+  padding: var(--spacing-md);
+  display: flex;
+  align-items: center;
+  border-right: 1px solid var(--bs-gray-200);
+  word-break: break-word;
+  overflow: hidden;
+  font-size: 14px;
+  background: var(--white);
+  color: var(--bs-gray-900); /* Tumma teksti valkoista taustaa vasten */
+}
+
+.product-cell:last-child {
+  border-right: none;
+}
+
+/* Tuotenumero sarake */
+.product-number-col .product-line {
+  display: block;
+  font-weight: 600;
+  color: var(--primary-color);
+  font-family: 'Courier New', monospace;
+}
+
+.product-number-col .product-code {
+  display: block;
+  font-size: var(--font-size-sm);
+  color: var(--bs-gray-600);
+  font-family: 'Courier New', monospace;
+}
+
+/* Status badge */
+.status-badge {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status-badge.active {
+  background: var(--bs-success-bg-subtle);
+  color: var(--bs-success);
+  border: 1px solid var(--bs-success-border-subtle);
+}
+
+.status-badge.inactive {
+  background: var(--bs-danger-bg-subtle);
+  color: var(--bs-danger);
+  border: 1px solid var(--bs-danger-border-subtle);
+}
+
+/* Loading more indicator */
+.loading-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-lg);
+  color: var(--bs-gray-600);
+  gap: var(--spacing-sm);
+}
+
+.spinner-small {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--bs-gray-300);
+  border-top: 2px solid var(--primary-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 /* Tuotenumero-sarakkeen erikoistyylit */
@@ -446,26 +697,17 @@
   font-weight: 400;
 }
 
-/* Pysyvät suodattimet */
-.filters-section {
-  background: white;
-  border-radius: 8px;
-  padding: 20px;
-  margin-bottom: 20px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.filters-section h3 {
-  margin: 0 0 16px 0;
-  color: #495057;
-  font-size: 18px;
-  font-weight: 600;
+.supplier-count {
+  font-size: 12px;
+  color: #6c757d;
+  margin-left: 8px;
+  font-weight: 400;
 }
 
 .filters-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 20px;
+  gap: var(--spacing-lg);
 }
 
 @media (max-width: 768px) {

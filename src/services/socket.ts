@@ -9,6 +9,7 @@ export interface SocketConfig {
 
 export interface ServerResponse {
   success: boolean;
+  message?: string;
   data?: unknown;
   error?: string;
 }
@@ -202,7 +203,8 @@ export class SocketClient {
         reject(new Error('API request timeout'));
       }, this.config.timeout);
 
-      const requestData = { action, params };
+      // Lähetä parametrit suoraan requestData-objektissa, älä params-objektissa
+      const requestData = { action, ...params };
       
       this.socket.emit('api-request', requestData, (response: ApiResponse) => {
         clearTimeout(timeout);
@@ -249,6 +251,50 @@ export class SocketClient {
 
   public async getProductLines(): Promise<ApiResponse<string[]>> {
     return this.apiRequest('get_product_lines') as Promise<ApiResponse<string[]>>;
+  }
+
+  // Installation methods API
+  public async getInstallationMethods(): Promise<ApiResponse<Array<{
+    id: number;
+    method_name: string;
+    method_code: number;
+    description?: string;
+  }>>> {
+    return this.apiRequest('get_product_installation_methods') as Promise<ApiResponse<Array<{
+      id: number;
+      method_name: string;
+      method_code: number;
+      description?: string;
+    }>>>;
+  }
+
+  public async addProductInstallation(params: {
+    productCode: string;
+    productLine: string;
+    methodCode: number;
+    standardHours: number;
+    isDefault?: boolean;
+  }): Promise<ApiResponse<{ success: boolean; id?: string }>> {
+    return this.apiRequest('add_product_installation', params) as Promise<ApiResponse<{ success: boolean; id?: string }>>;
+  }
+
+  public async getProductInstallations(params: {
+    productCode: string;
+    productLine: string;
+  }): Promise<ApiResponse<Array<{
+    id: string;
+    installationMethodId: string;
+    installationMethodName: string;
+    normiTime: number;
+    notes?: string;
+  }>>> {
+    return this.apiRequest('get_product_installations', params) as Promise<ApiResponse<Array<{
+      id: string;
+      installationMethodId: string;
+      installationMethodName: string;
+      normiTime: number;
+      notes?: string;
+    }>>>;
   }
 
   // Utility method for periodic ping to keep connection alive

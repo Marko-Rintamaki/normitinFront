@@ -1,7 +1,53 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
 import { useSocket } from '../context/SocketContext';
+import { ProductContextMenu } from '../components/ProductContextMenu';
+import { InstallationMethodModal } from '../components/InstallationMethodModal';
 import type { ProductSearchResult } from '../types/api';
 import './ProductsPage.css';
+
+// Memoisoitu hakukenttä-komponentti - ei renderöidy uudelleen turhaan
+const SearchInput = memo<{
+  value: string;
+  onChange: (value: string) => void;
+  onSubmit: (e: React.FormEvent) => void;
+  isConnected: boolean;
+  hasSearched: boolean;
+  onClear: () => void;
+}>(({ value, onChange, onSubmit, isConnected, hasSearched, onClear }) => {
+  return (
+    <form onSubmit={onSubmit} className="search-form">
+      <div className="search-input-group">
+        <input
+          type="text"
+          placeholder="🔍 Hae tuotteita... (hakutulokset päivittyvät reaaliajassa)"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="search-input"
+          autoComplete="off"
+          spellCheck="false"
+        />
+        <button 
+          type="submit" 
+          className="btn btn-primary search-btn"
+          disabled={!isConnected}
+        >
+          🔍 Hae
+        </button>
+        {hasSearched && (
+          <button 
+            type="button" 
+            onClick={onClear}
+            className="btn btn-secondary clear-btn"
+          >
+            ✕ Tyhjennä
+          </button>
+        )}
+      </div>
+    </form>
+  );
+});
+
+SearchInput.displayName = 'SearchInput';
 
 export const ProductsPage = () => {
   const { socketClient, connectionStatus } = useSocket();
@@ -11,6 +57,12 @@ export const ProductsPage = () => {
   const [sortBy, setSortBy] = useState('general_name');
   const [totalProducts, setTotalProducts] = useState(0);
   
+  // Virtualisointi ja lazy loading
+  const [displayedCount, setDisplayedCount] = useState(50); // Aloitetaan 50 tuotteella
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const tableBodyRef = useRef<HTMLDivElement>(null);
+  const ITEMS_PER_LOAD = 50;
+  
   // Toimittajat ja tuotelinjat - ladataan aina näkyviin
   const [availableSuppliers, setAvailableSuppliers] = useState<{supplier_code: string; supplier_name: string}[]>([]);
   const [availableProductLines, setAvailableProductLines] = useState<string[]>([]);
@@ -19,8 +71,22 @@ export const ProductsPage = () => {
   
   // Hakutoiminto
   const [searchQuery, setSearchQuery] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
+  const [currentSearchQuery, setCurrentSearchQuery] = useState(''); // Tallentaa viimeksi haetun queryn
   const [hasSearched, setHasSearched] = useState(false);
+  
+  // Context menu ja modal
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    product: ProductSearchResult;
+  } | null>(null);
+  const [installationModal, setInstallationModal] = useState<{
+    isOpen: boolean;
+    product: ProductSearchResult | null;
+  }>({
+    isOpen: false,
+    product: null
+  });
   
   // Ladataan toimittajavalinnat localStoragesta
   const loadSavedSuppliers = (): string[] => {
@@ -95,7 +161,6 @@ export const ProductsPage = () => {
       setProducts([]);
     } finally {
       setLoading(false);
-      setIsSearching(false);
     }
   }, [socketClient, connectionStatus.connected, searchFilters]);
 
@@ -174,29 +239,85 @@ export const ProductsPage = () => {
   // Reagoi suodattimien muutoksiin - käynnistä uusi haku
   useEffect(() => {
     if (hasSearched) {
-      // Jos on hakutilassa, käynnistä haku uudelleen hakusanalla
-      loadProducts(searchQuery);
+      // Jos on hakutilassa, käynnistä haku uudelleen tallennetulla hakusanalla
+      loadProducts(currentSearchQuery);
     } else {
       // Jos on selailutilassa, käynnistä yleishaku
       loadProducts();
     }
-  }, [searchFilters, hasSearched, loadProducts, searchQuery]);
+  }, [searchFilters, hasSearched, loadProducts, currentSearchQuery]); // ✅ Käytetään currentSearchQuery
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Säädä header-padding scrollbarin mukaan
+  useEffect(() => {
+    const adjustHeaderPadding = () => {
+      const tableBody = tableBodyRef.current;
+      if (tableBody) {
+        const hasScrollbar = tableBody.scrollHeight > tableBody.clientHeight;
+        const header = document.querySelector('.table-header') as HTMLElement;
+        if (header) {
+          // Pienemmät arvot vähentämään tyhjää tilaa oikealla
+          const scrollbarWidth = hasScrollbar ? 10.5 : 0; // Vähennetty 17 -> 12
+          const gapCompensation = 0; // Poistettu gap kompensaatio
+          header.style.paddingRight = `${scrollbarWidth + gapCompensation}px`;
+        }
+      }
+    };
+
+    // Säädä heti
+    adjustHeaderPadding();
     
+    // Säädä kun sisältö muuttuu
+    const timer = setTimeout(adjustHeaderPadding, 100);
+    
+    return () => clearTimeout(timer);
+  }, [products, displayedCount]);
+
+  // Debounced automaattinen haku - 500ms viive kirjoittamisen lopettamisen jälkeen
+  useEffect(() => {
+    // Älä tee hakua jos kenttä on tyhjä
+    if (!searchQuery.trim()) {
+      // Jos kenttä tyhjennettiin ja oli aiemmin hakutilassa, palaa selailutilaan
+      if (hasSearched) {
+        setHasSearched(false);
+        setCurrentSearchQuery('');
+        loadProducts(); // Lataa kaikki tuotteet
+      }
+      return;
+    }
+
+    // Debounce: odota 200ms ennen haun käynnistämistä (nopea viive)
+    const searchTimer = setTimeout(async () => {
+      console.log('Automaattinen haku käynnistyy:', searchQuery.trim());
+      setCurrentSearchQuery(searchQuery.trim());
+      setHasSearched(true);
+      await loadProducts(searchQuery.trim());
+    }, 200); // Vähennetty entisestään
+
+    // Peruuta edellinen timer jos käyttäjä jatkaa kirjoittamista
+    return () => clearTimeout(searchTimer);
+  }, [searchQuery, loadProducts, hasSearched]); // Lisätään hasSearched dependencies
+
+  // Memoisoidut callback-funktiot hakukentälle
+  const handleSearchQueryChange = useCallback((newValue: string) => {
+    setSearchQuery(newValue);
+  }, []);
+
+  const handleSearchSubmit = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    // Haku tapahtuu nyt automaattisesti, tämä on varmuuden vuoksi
     if (!searchQuery.trim()) {
       setError('Syötä hakusana');
       return;
     }
-
-    setIsSearching(true);
+    // Jos käyttäjä painaa Enter, käynnistä haku heti
+    setCurrentSearchQuery(searchQuery.trim());
     setHasSearched(true);
-    await loadProducts(searchQuery);
-  };
+    await loadProducts(searchQuery.trim());
+  }, [searchQuery, loadProducts]);
 
   const clearSearch = () => {
     setSearchQuery('');
+    setCurrentSearchQuery(''); // ✅ Tyhjennä myös tallennettu hakusana
     setHasSearched(false);
     setSearchFilters({
       suppliers: [],
@@ -213,8 +334,71 @@ export const ProductsPage = () => {
     }));
   };
 
-  const getFilteredProducts = () => {
-    // Suodatus tapahtuu nyt backendissä, tässä vain järjestetään tulokset
+  // Context menu käsittelijät
+  const handleProductRightClick = (event: React.MouseEvent, product: ProductSearchResult) => {
+    event.preventDefault();
+    setContextMenu({
+      x: event.clientX,
+      y: event.clientY,
+      product
+    });
+  };
+
+  const handleContextMenuClose = () => {
+    setContextMenu(null);
+  };
+
+  const handleAddInstallationMethod = (product: ProductSearchResult) => {
+    setInstallationModal({
+      isOpen: true,
+      product
+    });
+  };
+
+  const handleInstallationModalClose = () => {
+    setInstallationModal({
+      isOpen: false,
+      product: null
+    });
+  };
+
+  const handleInstallationSave = async (installationData: {
+    methodCode: number;
+    standardHours: number;
+    notes?: string;
+  }) => {
+    try {
+      if (!installationModal.product) return;
+
+      console.log('Tallentaa asennustapa:', {
+        product: installationModal.product.product_code,
+        ...installationData
+      });
+
+      const response = await socketClient?.addProductInstallation({
+        productCode: installationModal.product.product_code,
+        productLine: installationModal.product.product_line,
+        methodCode: installationData.methodCode,
+        standardHours: installationData.standardHours,
+        isDefault: false
+      });
+
+      if (response?.success) {
+        // TODO: Näytä onnistumisviesti
+        console.log('Asennustapa tallennettu onnistuneesti!');
+      } else {
+        throw new Error(response?.error || 'Tallentaminen epäonnistui');
+      }
+      
+    } catch (error) {
+      console.error('Asennustavan tallennus epäonnistui:', error);
+      // TODO: Näytä virheilmoitus käyttäjälle
+      alert(`Virhe: ${error instanceof Error ? error.message : 'Tuntematon virhe'}`);
+    }
+  };
+
+  // Tuotteet järjestettyinä - kaikki haku ja suodatus tapahtuu palvelimella
+  const filteredProducts = useMemo(() => {
     return [...products].sort((a, b) => {
       switch (sortBy) {
         case 'general_name':
@@ -229,9 +413,34 @@ export const ProductsPage = () => {
           return 0;
       }
     });
-  };
+  }, [products, sortBy]);
 
-  const filteredProducts = getFilteredProducts();
+  // Virtualisointi - näytetään vain tietty määrä tuotteita
+  const visibleProducts = useMemo(() => {
+    return filteredProducts.slice(0, displayedCount);
+  }, [filteredProducts, displayedCount]);
+
+  // Scroll handler lisää tuotteita tarpeen mukaan
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    const scrollPercentage = (scrollTop + clientHeight) / scrollHeight;
+    
+    // Kun scrollataan 80% loppuun, ladataan lisää
+    if (scrollPercentage > 0.8 && !isLoadingMore && displayedCount < filteredProducts.length) {
+      setIsLoadingMore(true);
+      
+      // Simuloidaan loading delay
+      setTimeout(() => {
+        setDisplayedCount(prev => Math.min(prev + ITEMS_PER_LOAD, filteredProducts.length));
+        setIsLoadingMore(false);
+      }, 200);
+    }
+  }, [isLoadingMore, displayedCount, filteredProducts.length, ITEMS_PER_LOAD]);
+
+  // Reset displayed count kun filtterit muuttuvat
+  useEffect(() => {
+    setDisplayedCount(ITEMS_PER_LOAD);
+  }, [searchQuery, searchFilters, ITEMS_PER_LOAD]);
 
   if (loading && products.length === 0) {
     return (
@@ -249,52 +458,32 @@ export const ProductsPage = () => {
 
   return (
     <div className="products-page">
-      <div className="page-header">
-        <h1>Tuotteet</h1>
-        <p className="page-subtitle">
-          {hasSearched 
-            ? `Hakutulokset - ${totalProducts} tuotetta`
-            : `Tuotteiden selaus ja haku - ${totalProducts} tuotetta`
-          }
-        </p>
-      </div>
-
-      {/* Hakukenttä */}
-      <div className="search-section">
-        <form onSubmit={handleSearch} className="search-form">
-          <div className="search-input-group">
-            <input
-              type="text"
-              placeholder="Hae tuotteita nimen, koodin tai teknisen nimen perusteella..."
+      <div className="container-fluid">
+        {/* Hakukenttä */}
+        <div className="search-section">
+          <div className="search-card">
+            <div className="search-header">
+              <h1 className="search-title">🔍 Tuotteiden haku</h1>
+              <p className="search-subtitle">
+                {hasSearched 
+                  ? `Hakutulokset - ${totalProducts} tuotetta löydetty`
+                  : `Tuoteluettelo - ${totalProducts} tuotetta saatavilla`
+                }
+              </p>
+            </div>
+            <SearchInput
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="search-input"
-              disabled={isSearching}
+              onChange={handleSearchQueryChange}
+              onSubmit={handleSearchSubmit}
+              isConnected={connectionStatus.connected}
+              hasSearched={hasSearched}
+              onClear={clearSearch}
             />
-            <button 
-              type="submit" 
-              className="btn btn-primary search-btn"
-              disabled={isSearching || !connectionStatus.connected}
-            >
-              {isSearching ? 'Hakee...' : '🔍 Hae'}
-            </button>
-            {hasSearched && (
-              <button 
-                type="button" 
-                onClick={clearSearch}
-                className="btn btn-secondary clear-btn"
-              >
-                ✕ Tyhjennä
-              </button>
-            )}
-          </div>
-        </form>
-      </div>
-
-      {/* Suodattimet - aina näkyvissä */}
-      <div className="filters-section">
-        <h3>Suodattimet</h3>
-        <div className="filters-grid">
+        
+        {/* Suodattimet samassa kortissa */}
+        <div className="filters-section">
+          <h3>🔧 Suodattimet</h3>
+          <div className="filters-grid">
           <div className="filter-group">
             <label>Toimittajat:</label>
             {loadingSuppliers ? (
@@ -359,7 +548,8 @@ export const ProductsPage = () => {
             </div>
           )}
         </div>
-      </div>
+        </div> {/* filters-section */}
+      </div> {/* search-card */}
 
       {/* Selaussuodattimet - näytetään vain selailutilassa */}
       {!hasSearched && (
@@ -427,8 +617,8 @@ export const ProductsPage = () => {
           <p>
             {loading 
               ? 'Ladataan tuotteita...'
-              : hasSearched && searchQuery
-                ? `Hakusanalla "${searchQuery}" ei löytynyt tuotteita.`
+              : hasSearched && currentSearchQuery
+                ? `Hakusanalla "${currentSearchQuery}" ei löytynyt tuotteita.`
                 : 'Tuotteita ei löytynyt valituilla suodattimilla.'
             }
           </p>
@@ -442,60 +632,104 @@ export const ProductsPage = () => {
         </div>
       ) : (
         <div className="products-table-container">
-          <table className="products-table">
-            <thead>
-              <tr>
-                <th>Tuotenumero</th>
-                <th>Nimi</th>
-                <th>Tekninen nimi</th>
-                <th>Toimittaja</th>
-                <th>Valmistaja</th>
-                <th>Yksikkö</th>
-                <th>Aktiivinen</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredProducts.map((product) => (
-                <tr key={`${product.product_line}-${product.product_code}`} className="product-row">
-                  <td className="product-number">
-                    <span className="product-line">{product.product_line}</span>
-                    <span className="product-code">{product.product_code}</span>
-                  </td>
-                  <td className="product-name">
-                    {product.general_name || '-'}
-                  </td>
-                  <td className="technical-name">
-                    {product.technical_name || '-'}
-                  </td>
-                  <td className="supplier">
-                    {product.supplier_name}
-                  </td>
-                  <td className="manufacturer">
-                    {product.manufacturer || '-'}
-                  </td>
-                  <td className="unit">
-                    {product.unit || '-'}
-                  </td>
-                  <td className="status">
-                    <span className={`status-badge ${product.active ? 'active' : 'inactive'}`}>
-                      {product.active ? 'Kyllä' : 'Ei'}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          {/* Kiinteät otsikot */}
+          <div className="table-header">
+            <div className="header-row">
+              <div className="header-cell product-number-col">Tuotenumero</div>
+              <div className="header-cell product-name-col">Nimi</div>
+              <div className="header-cell technical-name-col">Tekninen nimi</div>
+              <div className="header-cell supplier-col">Toimittaja</div>
+              <div className="header-cell manufacturer-col">Valmistaja</div>
+              <div className="header-cell unit-col">Yksikkö</div>
+              <div className="header-cell status-col">Aktiivinen</div>
+            </div>
+          </div>
+          
+          {/* Scrollattava sisältöalue */}
+          <div 
+            className="table-body" 
+            ref={tableBodyRef}
+            onScroll={handleScroll}
+          >
+            {visibleProducts.map((product) => (
+              <div 
+                key={`${product.product_line}-${product.product_code}`} 
+                className="product-row"
+                onContextMenu={(e) => handleProductRightClick(e, product)}
+                style={{ cursor: 'context-menu' }}
+              >
+                <div className="product-cell product-number-col">
+                  <span className="product-line">{product.product_line}</span>
+                  <span className="product-code">{product.product_code}</span>
+                </div>
+                <div className="product-cell product-name-col">
+                  {product.general_name || '-'}
+                </div>
+                <div className="product-cell technical-name-col">
+                  {product.technical_name || '-'}
+                </div>
+                <div className="product-cell supplier-col">
+                  {product.supplier_name}
+                </div>
+                <div className="product-cell manufacturer-col">
+                  {product.manufacturer || '-'}
+                </div>
+                <div className="product-cell unit-col">
+                  {product.unit || '-'}
+                </div>
+                <div className="product-cell status-col">
+                  <span className={`status-badge ${product.active ? 'active' : 'inactive'}`}>
+                    {product.active ? 'Kyllä' : 'Ei'}
+                  </span>
+                </div>
+              </div>
+            ))}
+            
+            {/* Loading indicator */}
+            {isLoadingMore && (
+              <div className="loading-more">
+                <div className="spinner-small"></div>
+                <span>Ladataan lisää tuotteita...</span>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
       <div className="products-summary">
         <p>
           {hasSearched 
-            ? `Hakutulokset: ${filteredProducts.length}/${totalProducts} tuotetta`
-            : `Näytetään ${filteredProducts.length} tuotetta ${totalProducts} tuotteesta`
+            ? `Hakutulokset: ${visibleProducts.length}/${filteredProducts.length} tuotetta näytetään (${totalProducts} yhteensä)`
+            : `Näytetään ${visibleProducts.length}/${filteredProducts.length} tuotetta (${totalProducts} yhteensä)`
           }
         </p>
       </div>
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <ProductContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          product={contextMenu.product}
+          onClose={handleContextMenuClose}
+          onAddInstallationMethod={handleAddInstallationMethod}
+        />
+      )}
+
+      {/* Installation Method Modal */}
+      {socketClient && (
+        <InstallationMethodModal
+          isOpen={installationModal.isOpen}
+          product={installationModal.product}
+          socketClient={socketClient}
+          onClose={handleInstallationModalClose}
+          onSave={handleInstallationSave}
+        />
+      )}
+            
+      </div> {/* container-fluid */}
+    </div> {/* products-page */}
+  
     </div>
   );
 };
