@@ -1,0 +1,100 @@
+.installation-method-modal {
+  max-width: 500px;
+  width: 90%;
+}
+
+.method-selection-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 20px 0;
+}
+
+.method-selection-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: white;
+}
+
+.method-selection-item:hover {
+  border-color: var(--primary-color, #ffc107);
+  background: #fff9e6;
+}
+
+.method-selection-item.selected {
+  border-color: var(--primary-color, #ffc107);
+  background: #fff9e6;
+  box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.2);
+}
+
+.method-info {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.method-info strong {
+  font-size: 16px;
+  color: #333;
+}
+
+.method-details {
+  font-size: 13px;
+  color: #666;
+}
+
+.method-radio input[type="radio"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  accent-color: var(--primary-color, #ffc107);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #eee;
+}
+
+.modal-actions .btn {
+  padding: 10px 20px;
+  border-radius: 5px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+}
+
+.modal-actions .btn-secondary {
+  background: #6c757d;
+  color: white;
+}
+
+.modal-actions .btn-secondary:hover {
+  background: #5a6268;
+}
+
+.modal-actions .btn-primary {
+  background: var(--primary-color, #ffc107);
+  color: #212529;
+}
+
+.modal-actions .btn-primary:hover {
+  background: var(--primary-dark, #e0a800);
+}
+
+.modal-actions .btn-primary:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
