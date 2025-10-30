@@ -9,6 +9,7 @@ interface ProductContextMenuProps {
   onClose: () => void;
   onAddInstallationMethod: (product: ProductSearchResult) => void;
   onCreatePackage: (product: ProductSearchResult) => void;
+  onReplaceProduct: (product: ProductSearchResult) => void;
 }
 
 export const ProductContextMenu: React.FC<ProductContextMenuProps> = ({
@@ -17,7 +18,8 @@ export const ProductContextMenu: React.FC<ProductContextMenuProps> = ({
   product,
   onClose,
   onAddInstallationMethod,
-  onCreatePackage
+  onCreatePackage,
+  onReplaceProduct
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -53,6 +55,11 @@ export const ProductContextMenu: React.FC<ProductContextMenuProps> = ({
     onClose();
   };
 
+  const handleReplaceProduct = () => {
+    onReplaceProduct(product);
+    onClose();
+  };
+
   return (
     <div
       ref={menuRef}
@@ -85,6 +92,14 @@ export const ProductContextMenu: React.FC<ProductContextMenuProps> = ({
         >
           <span className="icon">🔧</span>
           Lisää asennustapa
+        </button>
+        
+        <button 
+          className="context-menu-item"
+          onClick={handleReplaceProduct}
+        >
+          <span className="icon">🔄</span>
+          Korvaa tuote
         </button>
         
         <button 

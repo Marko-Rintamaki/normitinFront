@@ -7,6 +7,7 @@ interface SearchFilters {
   supplier: string;
   productLine: string;
   activeOnly: boolean | null;
+  hasReferences: boolean | null;
 }
 
 export const ProductSearchPage = () => {
@@ -21,7 +22,8 @@ export const ProductSearchPage = () => {
   const [filters, setFilters] = useState<SearchFilters>({
     supplier: '',
     productLine: '',
-    activeOnly: null
+    activeOnly: null,
+    hasReferences: null
   });
 
   const handleSearch = async (e: React.FormEvent) => {
@@ -47,7 +49,8 @@ export const ProductSearchPage = () => {
         limit: 50,
         activeOnly: filters.activeOnly ?? true,
         supplier: filters.supplier || undefined,
-        productLine: filters.productLine || undefined
+        productLine: filters.productLine || undefined,
+        hasReferences: filters.hasReferences ?? undefined
       });
       
       if (response.success && response.data) {
@@ -75,7 +78,8 @@ export const ProductSearchPage = () => {
     setFilters({
       supplier: '',
       productLine: '',
-      activeOnly: null
+      activeOnly: null,
+      hasReferences: null
     });
   };
 
@@ -162,6 +166,21 @@ export const ProductSearchPage = () => {
               <option value="">Kaikki</option>
               <option value="true">Vain aktiiviset</option>
               <option value="false">Vain ei-aktiiviset</option>
+            </select>
+          </div>
+
+          <div className="filter-group">
+            <label htmlFor="references-filter">Riippuvuudet:</label>
+            <select
+              id="references-filter"
+              value={filters.hasReferences === null ? '' : String(filters.hasReferences)}
+              onChange={(e) => updateFilter('hasReferences', e.target.value === '' ? null : e.target.value === 'true')}
+              className="form-control"
+              title="Suodata tuotteet riippuvuuksien mukaan (asennustavat, paketit)"
+            >
+              <option value="">Kaikki tuotteet</option>
+              <option value="true">Vain tuotteet joilla riippuvuuksia</option>
+              <option value="false">Vain tuotteet ilman riippuvuuksia</option>
             </select>
           </div>
         </div>

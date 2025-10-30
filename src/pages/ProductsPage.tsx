@@ -3,6 +3,7 @@ import { useSocket } from '../context/SocketContext';
 import { ProductContextMenu } from '../components/ProductContextMenu';
 import { InstallationMethodModal } from '../components/InstallationMethodModal';
 import { PackageModal } from '../components/PackageModal';
+import { ReplaceProductModal } from '../components/ReplaceProductModal';
 import type { ProductSearchResult } from '../types/api';
 import './ProductsPage.css';
 
@@ -103,6 +104,14 @@ export const ProductsPage = () => {
     isOpen: false,
     product: null
   });
+
+  const [replaceProductModal, setReplaceProductModal] = useState<{
+    isOpen: boolean;
+    product: ProductSearchResult | null;
+  }>({
+    isOpen: false,
+    product: null
+  });
   
   // Expanded rivien hallinta asennustapojen näyttämiseksi
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
@@ -153,7 +162,8 @@ export const ProductsPage = () => {
   const [searchFilters, setSearchFilters] = useState({
     suppliers: loadSavedSuppliers(), // Ladataan tallennettuja valintoja
     productLines: [] as string[], // Tuotelinjat
-    activeOnly: null as boolean | null
+    activeOnly: null as boolean | null,
+    hasReferences: null as boolean | null
   });
 
   const loadProducts = useCallback(async (query?: string) => {
@@ -173,6 +183,7 @@ export const ProductsPage = () => {
         suppliers?: string[];
         productLines?: string[];
         activeOnly?: boolean;
+        hasReferences?: boolean;
       };
 
       if (query && query.trim()) {
@@ -187,6 +198,10 @@ export const ProductsPage = () => {
       // Lähetetään suodattimet backendiin
       if (searchFilters.activeOnly !== null) {
         searchParams.activeOnly = searchFilters.activeOnly;
+      }
+      
+      if (searchFilters.hasReferences !== null) {
+        searchParams.hasReferences = searchFilters.hasReferences;
       }
       
       if (searchFilters.suppliers.length > 0) {
@@ -465,7 +480,8 @@ export const ProductsPage = () => {
     setSearchFilters({
       suppliers: [],
       productLines: [],
-      activeOnly: null
+      activeOnly: null,
+      hasReferences: null
     });
     loadProducts();
   };
@@ -493,6 +509,13 @@ export const ProductsPage = () => {
 
   const handleCreatePackage = (product: ProductSearchResult) => {
     setPackageModal({
+      isOpen: true,
+      product
+    });
+  };
+
+  const handleReplaceProduct = (product: ProductSearchResult) => {
+    setReplaceProductModal({
       isOpen: true,
       product
     });
@@ -549,6 +572,13 @@ export const ProductsPage = () => {
     });
   };
 
+  const handleReplaceProductModalClose = () => {
+    setReplaceProductModal({
+      isOpen: false,
+      product: null
+    });
+  };
+
   const handlePackageSave = async (packageData: {
     description: string;
     notes?: string;
@@ -582,6 +612,18 @@ export const ProductsPage = () => {
       console.error('Paketin tallennus epäonnistui:', error);
       alert(`Virhe: ${error instanceof Error ? error.message : 'Tuntematon virhe'}`);
     }
+  };
+
+  const handleReplaceProductSuccess = async () => {
+    // Päivitä tuotelista korvaamisen jälkeen
+    if (hasSearched) {
+      await loadProducts(currentSearchQuery);
+    } else {
+      await loadProducts();
+    }
+    // Päivitä myös asennustavat ja paketit
+    await refreshAllInstallations();
+    await refreshAllPackages();
   };
 
   // Tarkistaa onko tuotteella asennustapoja muistista ladatusta datasta
@@ -873,6 +915,26 @@ export const ProductsPage = () => {
               </div>
             )}
           </div>
+
+          <div className="filter-group">
+            <label>Riippuvuudet:</label>
+            <select
+              value={searchFilters.hasReferences === null ? 'all' : searchFilters.hasReferences ? 'with' : 'without'}
+              onChange={(e) => {
+                const val = e.target.value;
+                setSearchFilters(prev => ({
+                  ...prev,
+                  hasReferences: val === 'all' ? null : val === 'with'
+                }));
+              }}
+              className="search-active-filter"
+              title="Suodata tuotteet riippuvuuksien mukaan (asennustavat, paketit)"
+            >
+              <option value="all">Kaikki tuotteet</option>
+              <option value="with">Vain tuotteet joilla riippuvuuksia</option>
+              <option value="without">Vain tuotteet ilman riippuvuuksia</option>
+            </select>
+          </div>
         </div> {/* filters-section */}
       </div> {/* search-card */}
       </div> {/* search-section */}
@@ -1114,6 +1176,7 @@ export const ProductsPage = () => {
           onClose={handleContextMenuClose}
           onAddInstallationMethod={handleAddInstallationMethod}
           onCreatePackage={handleCreatePackage}
+          onReplaceProduct={handleReplaceProduct}
         />
       )}
 
@@ -1135,6 +1198,16 @@ export const ProductsPage = () => {
           product={packageModal.product}
           onClose={handlePackageModalClose}
           onSave={handlePackageSave}
+        />
+      )}
+
+      {/* Replace Product Modal */}
+      {replaceProductModal.product && (
+        <ReplaceProductModal
+          isOpen={replaceProductModal.isOpen}
+          product={replaceProductModal.product}
+          onClose={handleReplaceProductModalClose}
+          onSuccess={handleReplaceProductSuccess}
         />
       )}
             

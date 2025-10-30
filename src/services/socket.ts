@@ -225,6 +225,7 @@ export class SocketClient {
     activeOnly?: boolean;
     supplier?: string;
     productLine?: string;
+    hasReferences?: boolean;
   }): Promise<ApiResponse<ProductSearchResponse>> {
     return this.apiRequest('search_products', {
       query,
@@ -238,6 +239,7 @@ export class SocketClient {
     activeOnly?: boolean;
     supplier?: string;
     productLine?: string;
+    hasReferences?: boolean;
   }): Promise<ApiResponse<ProductSearchResponse>> {
     return this.apiRequest('search_products_with_installations', {
       query,

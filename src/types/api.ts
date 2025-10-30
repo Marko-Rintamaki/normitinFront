@@ -65,4 +65,5 @@ export interface ProductSearchParams {
   productLine?: string;
   suppliers?: string[];
   productLines?: string[];
+  hasReferences?: boolean;
 }
