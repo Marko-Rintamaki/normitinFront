@@ -3,21 +3,22 @@ import { useSocket } from '../context/SocketContext';
 import './SettingsPage.css';
 
 interface InstallationMethod {
-  method_code: string;
+  id: number;
+  product_line: string;
+  method_code: number;
   method_name: string;
   description: string;
-  is_active: boolean;
+  legacy_id: number | null;
   created: string;
-  updated?: string;
 }
 
 interface PackageInstallationMethod {
-  method_code: string;
+  id: number;
+  product_line: string;
+  method_code: number;
   method_name: string;
   description: string;
-  is_active: boolean;
   created: string;
-  updated?: string;
 }
 
 export const SettingsPage = () => {
@@ -98,19 +99,23 @@ export const SettingsPage = () => {
               <table className="methods-table">
                 <thead>
                   <tr>
+                    <th>ID</th>
+                    <th>Linja</th>
                     <th>Koodi</th>
                     <th>Nimi</th>
                     <th>Kuvaus</th>
-                    <th>Aktiivinen</th>
+                    <th>Legacy ID</th>
                   </tr>
                 </thead>
                 <tbody>
                   {productMethods.map(m => (
-                    <tr key={m.method_code}>
+                    <tr key={m.id}>
+                      <td>{m.id}</td>
+                      <td>{m.product_line}</td>
                       <td>{m.method_code}</td>
                       <td><strong>{m.method_name}</strong></td>
                       <td>{m.description || '-'}</td>
-                      <td>{m.is_active ? '✓' : '✗'}</td>
+                      <td>{m.legacy_id || '-'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -132,19 +137,21 @@ export const SettingsPage = () => {
               <table className="methods-table">
                 <thead>
                   <tr>
+                    <th>ID</th>
+                    <th>Linja</th>
                     <th>Koodi</th>
                     <th>Nimi</th>
                     <th>Kuvaus</th>
-                    <th>Aktiivinen</th>
                   </tr>
                 </thead>
                 <tbody>
                   {packageMethods.map(m => (
-                    <tr key={m.method_code}>
+                    <tr key={m.id}>
+                      <td>{m.id}</td>
+                      <td>{m.product_line}</td>
                       <td>{m.method_code}</td>
                       <td><strong>{m.method_name}</strong></td>
                       <td>{m.description || '-'}</td>
-                      <td>{m.is_active ? '✓' : '✗'}</td>
                     </tr>
                   ))}
                 </tbody>
