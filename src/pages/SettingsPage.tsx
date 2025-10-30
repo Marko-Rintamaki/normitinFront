@@ -23,7 +23,6 @@ export const SettingsPage = () => {
   const { socketClient, connectionStatus } = useSocket();
   const [productMethods, setProductMethods] = useState<InstallationMethod[]>([]);
   const [packageMethods, setPackageMethods] = useState<PackageInstallationMethod[]>([]);
-  const [activeTab, setActiveTab] = useState<'product' | 'package'>('product');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const showMessage = (type: 'success' | 'error', text: string) => {
@@ -33,25 +32,33 @@ export const SettingsPage = () => {
 
   const loadProductMethods = async () => {
     if (!socketClient) return;
+    console.log('🔧 Ladataan tuotteen asennustavat...');
     try {
-      const response: any = await socketClient.apiRequest('get_product_installation_methods', {});
+      const response = await socketClient.apiRequest('get_product_installation_methods', {}) as any;
+      console.log('📦 Tuotteen asennustavat vastaus:', response);
       if (response.success && Array.isArray(response.data)) {
         setProductMethods(response.data);
+        console.log('✅ Ladattu', response.data.length, 'tuotteen asennustapaa');
       }
     } catch (err) {
-      showMessage('error', 'Lataus epäonnistui');
+      console.error('❌ Tuotteen asennustapojen lataus epäonnistui:', err);
+      showMessage('error', 'Tuotteen asennustapojen lataus epäonnistui');
     }
   };
 
   const loadPackageMethods = async () => {
     if (!socketClient) return;
+    console.log('📦 Ladataan paketin asennustavat...');
     try {
-      const response: any = await socketClient.apiRequest('get_package_installation_methods', {});
+      const response = await socketClient.apiRequest('get_package_installation_methods', {}) as any;
+      console.log('📦 Paketin asennustavat vastaus:', response);
       if (response.success && Array.isArray(response.data)) {
         setPackageMethods(response.data);
+        console.log('✅ Ladattu', response.data.length, 'paketin asennustapaa');
       }
     } catch (err) {
-      showMessage('error', 'Lataus epäonnistui');
+      console.error('❌ Paketin asennustapojen lataus epäonnistui:', err);
+      showMessage('error', 'Paketin asennustapojen lataus epäonnistui');
     }
   };
 
@@ -60,6 +67,7 @@ export const SettingsPage = () => {
       loadProductMethods();
       loadPackageMethods();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [socketClient, connectionStatus.connected]);
 
   return (
@@ -75,29 +83,18 @@ export const SettingsPage = () => {
         </div>
       )}
 
-      <div className="tabs">
-        <button
-          className={`tab ${activeTab === 'product' ? 'active' : ''}`}
-          onClick={() => setActiveTab('product')}
-        >
-          🔧 Tuotteen asennustavat ({productMethods.length})
-        </button>
-        <button
-          className={`tab ${activeTab === 'package' ? 'active' : ''}`}
-          onClick={() => setActiveTab('package')}
-        >
-          📦 Paketin asennustavat ({packageMethods.length})
-        </button>
-      </div>
-
-      {activeTab === 'product' && (
-        <div className="tab-content">
-          <h2>Tuotteen asennustavat</h2>
+      <div className="methods-grid">
+        {/* TUOTTEEN ASENNUSTAVAT - VASEN PUOLI */}
+        <div className="methods-section">
+          <div className="section-header">
+            <h2>🔧 Tuotteen asennustavat</h2>
+            <span className="badge">{productMethods.length} kpl</span>
+          </div>
           <div className="methods-list">
             {productMethods.length === 0 ? (
-              <p>Ei asennustapoja</p>
+              <p className="empty-message">Ei asennustapoja</p>
             ) : (
-              <table>
+              <table className="methods-table">
                 <thead>
                   <tr>
                     <th>Koodi</th>
@@ -118,16 +115,18 @@ export const SettingsPage = () => {
             )}
           </div>
         </div>
-      )}
 
-      {activeTab === 'package' && (
-        <div className="tab-content">
-          <h2>Paketin asennustavat</h2>
+        {/* PAKETIN ASENNUSTAVAT - OIKEA PUOLI */}
+        <div className="methods-section">
+          <div className="section-header">
+            <h2>📦 Paketin asennustavat</h2>
+            <span className="badge">{packageMethods.length} kpl</span>
+          </div>
           <div className="methods-list">
             {packageMethods.length === 0 ? (
-              <p>Ei asennustapoja</p>
+              <p className="empty-message">Ei asennustapoja</p>
             ) : (
-              <table>
+              <table className="methods-table">
                 <thead>
                   <tr>
                     <th>ID</th>
@@ -150,7 +149,7 @@ export const SettingsPage = () => {
             )}
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 };
