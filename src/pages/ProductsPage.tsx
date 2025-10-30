@@ -1042,6 +1042,9 @@ export const ProductsPage = () => {
               const hasPackage = productHasPackage(product);
               
               // Debug: Näytetään tila konsolissa
+              if (hasInstallations) {
+                console.log(`🟢 Tuote ${product.product_line}-${product.product_code} on asennustapoja (${installationCount} kpl) - nuoli pitäisi olla vihreä`);
+              }
               if (hasPackage) {
                 console.log(`🎨 Tuote ${product.product_line}-${product.product_code} renderöidään sinisellä (has-package: true)`);
               }

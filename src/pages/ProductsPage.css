@@ -908,13 +908,13 @@
 }
 
 .expand-btn.has-installations {
-  color: #4CAF50;
+  color: #4CAF50 !important;
   font-weight: bold;
 }
 
 .expand-btn.has-installations:hover {
   background-color: #e8f5e8;
-  color: #2E7D32;
+  color: #2E7D32 !important;
 }
 
 .status-col {
