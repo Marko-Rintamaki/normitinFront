@@ -116,7 +116,7 @@ export const SettingsPage = () => {
     if (!confirm(`Poistetaanko asennustapa "${method.method_name}"?`)) return;
     
     try {
-      const action = type === 'product' ? 'delete_product_installation_method' : 'delete_package_installation_method';
+      const action = type === 'product' ? 'delete_product_installation_method' : 'delete_package_installation_method_definition';
       await socketClient?.apiRequest(action, { id: method.id });
       showMessage('success', 'Asennustapa poistettu');
       if (type === 'product') {
@@ -137,7 +137,7 @@ export const SettingsPage = () => {
       const isNew = editingMethod.id === 0;
       const action = editingType === 'product' 
         ? (isNew ? 'add_product_installation_method' : 'update_product_installation_method')
-        : (isNew ? 'add_package_installation_method' : 'update_package_installation_method');
+        : (isNew ? 'add_package_installation_method_definition' : 'update_package_installation_method_definition');
 
       await socketClient?.apiRequest(action, {...editingMethod} as unknown as Record<string, unknown>);
       showMessage('success', isNew ? 'Asennustapa lisätty' : 'Asennustapa päivitetty');
