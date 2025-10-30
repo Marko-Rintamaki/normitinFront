@@ -3,20 +3,21 @@ import { useSocket } from '../context/SocketContext';
 import './SettingsPage.css';
 
 interface InstallationMethod {
-  method_code: number;
+  method_code: string;
   method_name: string;
-  legacy_id: number | null;
   description: string;
+  is_active: boolean;
   created: string;
+  updated?: string;
 }
 
 interface PackageInstallationMethod {
-  id: number;
-  method_id: number;
+  method_code: string;
   method_name: string;
-  standard_hours: number;
-  description?: string;
+  description: string;
+  is_active: boolean;
   created: string;
+  updated?: string;
 }
 
 export const SettingsPage = () => {
@@ -34,9 +35,9 @@ export const SettingsPage = () => {
     if (!socketClient) return;
     console.log('🔧 Ladataan tuotteen asennustavat...');
     try {
-      const response = await socketClient.apiRequest('get_product_installation_methods', {}) as any;
+      const response = await socketClient.apiRequest('get_product_installation_methods', {});
       console.log('📦 Tuotteen asennustavat vastaus:', response);
-      if (response.success && Array.isArray(response.data)) {
+      if (response && typeof response === 'object' && 'success' in response && response.success && 'data' in response && Array.isArray(response.data)) {
         setProductMethods(response.data);
         console.log('✅ Ladattu', response.data.length, 'tuotteen asennustapaa');
       }
@@ -50,9 +51,9 @@ export const SettingsPage = () => {
     if (!socketClient) return;
     console.log('📦 Ladataan paketin asennustavat...');
     try {
-      const response = await socketClient.apiRequest('get_package_installation_methods', {}) as any;
+      const response = await socketClient.apiRequest('get_all_package_installation_method_definitions', {});
       console.log('📦 Paketin asennustavat vastaus:', response);
-      if (response.success && Array.isArray(response.data)) {
+      if (response && typeof response === 'object' && 'success' in response && response.success && 'data' in response && Array.isArray(response.data)) {
         setPackageMethods(response.data);
         console.log('✅ Ladattu', response.data.length, 'paketin asennustapaa');
       }
@@ -100,6 +101,7 @@ export const SettingsPage = () => {
                     <th>Koodi</th>
                     <th>Nimi</th>
                     <th>Kuvaus</th>
+                    <th>Aktiivinen</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -108,6 +110,7 @@ export const SettingsPage = () => {
                       <td>{m.method_code}</td>
                       <td><strong>{m.method_name}</strong></td>
                       <td>{m.description || '-'}</td>
+                      <td>{m.is_active ? '✓' : '✗'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -129,19 +132,19 @@ export const SettingsPage = () => {
               <table className="methods-table">
                 <thead>
                   <tr>
-                    <th>ID</th>
+                    <th>Koodi</th>
                     <th>Nimi</th>
-                    <th>Tunnit</th>
                     <th>Kuvaus</th>
+                    <th>Aktiivinen</th>
                   </tr>
                 </thead>
                 <tbody>
                   {packageMethods.map(m => (
-                    <tr key={m.id}>
-                      <td>{m.method_id}</td>
+                    <tr key={m.method_code}>
+                      <td>{m.method_code}</td>
                       <td><strong>{m.method_name}</strong></td>
-                      <td>{m.standard_hours} h</td>
                       <td>{m.description || '-'}</td>
+                      <td>{m.is_active ? '✓' : '✗'}</td>
                     </tr>
                   ))}
                 </tbody>
