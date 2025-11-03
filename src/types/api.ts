@@ -44,6 +44,10 @@ export interface ProductSearchResult {
   active: boolean;
   created: string;
   updated: string;
+  replacement_status?: string;
+  replaced_by_product_line?: string;
+  replaced_by_product_code?: string;
+  replaced_at?: string;
 }
 
 export interface ProductSearchResponse {
@@ -66,4 +70,5 @@ export interface ProductSearchParams {
   suppliers?: string[];
   productLines?: string[];
   hasReferences?: boolean;
+  replacementStatus?: string;
 }

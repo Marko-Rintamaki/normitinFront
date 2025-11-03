@@ -415,7 +415,7 @@ export const PackagesPage = () => {
     const loadMethods = async () => {
       try {
         console.log('🔍 Loading package installation methods catalog...');
-        const response = await socketClient.apiRequest('get_package_installation_methods_catalog', {}) as { success: boolean; data?: unknown[] };
+        const response = await socketClient.apiRequest('get_all_package_installation_method_definitions', {}) as { success: boolean; data?: unknown[] };
         
         console.log('📦 Installation methods response:', response);
         

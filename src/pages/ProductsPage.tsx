@@ -13,9 +13,7 @@ const SearchInput = memo<{
   onChange: (value: string) => void;
   onSubmit: (e: React.FormEvent) => void;
   onClear: () => void;
-  activeOnly: boolean | null;
-  onActiveOnlyChange: (value: boolean | null) => void;
-}>(({ value, onChange, onSubmit, onClear, activeOnly, onActiveOnlyChange }) => {
+}>(({ value, onChange, onSubmit, onClear }) => {
   return (
     <form onSubmit={onSubmit} className="search-form">
       <div className="search-input-container">
@@ -37,19 +35,6 @@ const SearchInput = memo<{
         >
           ✕
         </button>
-        <select
-          value={activeOnly === null ? 'all' : activeOnly ? 'active' : 'inactive'}
-          onChange={(e) => {
-            const val = e.target.value;
-            onActiveOnlyChange(val === 'all' ? null : val === 'active');
-          }}
-          className="search-active-filter"
-          title="Näytä vain aktiiviset tuotteet"
-        >
-          <option value="all">Kaikki tuotteet</option>
-          <option value="active">Vain aktiiviset</option>
-          <option value="inactive">Vain epäaktiiviset</option>
-        </select>
       </div>
     </form>
   );
@@ -163,7 +148,14 @@ export const ProductsPage = () => {
     suppliers: loadSavedSuppliers(), // Ladataan tallennettuja valintoja
     productLines: [] as string[], // Tuotelinjat
     activeOnly: null as boolean | null,
-    hasReferences: null as boolean | null
+    hasReferences: null as boolean | null,
+    replacementStatus: undefined as string | undefined
+  });
+
+  // Dropdownien avaus/sulku tila
+  const [dropdownOpen, setDropdownOpen] = useState({
+    suppliers: false,
+    productLines: false
   });
 
   const loadProducts = useCallback(async (query?: string) => {
@@ -184,6 +176,7 @@ export const ProductsPage = () => {
         productLines?: string[];
         activeOnly?: boolean;
         hasReferences?: boolean;
+        replacementStatus?: string;
       };
 
       if (query && query.trim()) {
@@ -204,6 +197,11 @@ export const ProductsPage = () => {
         searchParams.hasReferences = searchFilters.hasReferences;
       }
       
+      if (searchFilters.replacementStatus !== undefined) {
+        searchParams.replacementStatus = searchFilters.replacementStatus;
+        console.log('🔍 Replacement status filter:', searchFilters.replacementStatus);
+      }
+      
       if (searchFilters.suppliers.length > 0) {
         // Lähetetään kaikki valitut toimittajat
         searchParams.suppliers = searchFilters.suppliers;
@@ -215,6 +213,9 @@ export const ProductsPage = () => {
       }
       
       const response = await socketClient.searchProducts(searchParams.query, searchParams);
+      
+      console.log('🔍 Search params sent to backend:', searchParams);
+      console.log('🔍 Products received:', response.data?.products.length);
       
       if (response.success && response.data) {
         setProducts(response.data.products || []);
@@ -398,6 +399,19 @@ export const ProductsPage = () => {
     }
   }, [searchFilters, hasSearched, loadProducts, currentSearchQuery]); // ✅ Käytetään currentSearchQuery
 
+  // Sulje dropdownit kun klikataan muualle
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.dropdown-filter')) {
+        setDropdownOpen({ suppliers: false, productLines: false });
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   // Säädä header-padding scrollbarin mukaan
   useEffect(() => {
     const adjustHeaderPadding = () => {
@@ -453,13 +467,6 @@ export const ProductsPage = () => {
     setSearchQuery(newValue);
   }, []);
 
-  const handleActiveOnlyChange = useCallback((newValue: boolean | null) => {
-    setSearchFilters(prev => ({
-      ...prev,
-      activeOnly: newValue
-    }));
-  }, []);
-
   const handleSearchSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     // Haku tapahtuu nyt automaattisesti, tämä on varmuuden vuoksi
@@ -481,7 +488,8 @@ export const ProductsPage = () => {
       suppliers: [],
       productLines: [],
       activeOnly: null,
-      hasReferences: null
+      hasReferences: null,
+      replacementStatus: undefined
     });
     loadProducts();
   };
@@ -845,149 +853,206 @@ export const ProductsPage = () => {
       <div className="container-fluid">
         {/* Hakukenttä */}
         <div className="search-section">
-          <div className="search-card">
-            <div className="search-header">
-              <h1 className="search-title">🔍 Tuotteiden haku</h1>
-              <p className="search-subtitle">
-                {hasSearched 
-                  ? `Hakutulokset - ${totalProducts} tuotetta löydetty`
-                  : `Tuoteluettelo - ${totalProducts} tuotetta saatavilla`
-                }
-              </p>
-            </div>
+          <div className="search-card-compact">
             <SearchInput
               value={searchQuery}
               onChange={handleSearchQueryChange}
               onSubmit={handleSearchSubmit}
               onClear={clearSearch}
-              activeOnly={searchFilters.activeOnly}
-              onActiveOnlyChange={handleActiveOnlyChange}
             />
         
-        {/* Suodattimet samassa kortissa */}
-        <div className="filters-section">
-          <h3>🔧 Suodattimet</h3>
-          <div className="filters-grid">
-          <div className="filter-group">
-            <label>Toimittajat:</label>
-            {loadingSuppliers ? (
-              <p>Ladataan toimittajia...</p>
-            ) : (
-              <div className="supplier-checkboxes">
-                {availableSuppliers.map(supplier => (
-                  <label key={supplier.supplier_code} className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={searchFilters.suppliers.includes(supplier.supplier_name)}
-                      onChange={() => toggleSupplier(supplier)}
-                      className="checkbox"
-                    />
-                    <span className="checkbox-text">{supplier.supplier_name}</span>
-                    <span className="supplier-count">
-                      ({products.filter(p => p.supplier_name === supplier.supplier_name).length})
-                    </span>
-                  </label>
-                ))}
+            {/* Suodattimet kompaktisti samalla rivillä */}
+            <div className="filters-row">
+              <div className="filter-compact">
+                {loadingSuppliers ? (
+                  <span className="loading-text">Ladataan...</span>
+                ) : (
+                  <div className="dropdown-filter">
+                    <button 
+                      className="dropdown-toggle-compact"
+                      onClick={() => setDropdownOpen(prev => ({ ...prev, suppliers: !prev.suppliers }))}
+                      type="button"
+                    >
+                      {searchFilters.suppliers.length === 0 
+                        ? 'Toimittajat' 
+                        : `Toimittajat (${searchFilters.suppliers.length})`}
+                      <span className="dropdown-arrow">{dropdownOpen.suppliers ? '▲' : '▼'}</span>
+                    </button>
+                    {dropdownOpen.suppliers && (
+                      <div className="dropdown-menu" onClick={(e) => e.stopPropagation()}>
+                        {availableSuppliers.map(supplier => (
+                          <label key={supplier.supplier_code} className="dropdown-item">
+                            <input
+                              type="checkbox"
+                              checked={searchFilters.suppliers.includes(supplier.supplier_name)}
+                              onChange={() => toggleSupplier(supplier)}
+                              className="checkbox"
+                            />
+                            <span className="checkbox-text">{supplier.supplier_name}</span>
+                            <span className="supplier-count">
+                              ({products.filter(p => p.supplier_name === supplier.supplier_name).length})
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-          <div className="filter-group">
-            <label>Tuotelinjat:</label>
-            {loadingProductLines ? (
-              <p>Ladataan tuotelinjoja...</p>
-            ) : (
-              <div className="supplier-checkboxes">
-                {availableProductLines.map(productLine => (
-                  <label key={productLine} className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={searchFilters.productLines.includes(productLine)}
-                      onChange={() => toggleProductLine(productLine)}
-                      className="checkbox"
-                    />
-                    <span className="checkbox-text">{productLine}</span>
-                    <span className="supplier-count">
-                      ({products.filter(p => p.product_line === productLine).length})
-                    </span>
-                  </label>
-                ))}
+              <div className="filter-compact">
+                {loadingProductLines ? (
+                  <span className="loading-text">Ladataan...</span>
+                ) : (
+                  <div className="dropdown-filter">
+                    <button 
+                      className="dropdown-toggle-compact"
+                      onClick={() => setDropdownOpen(prev => ({ ...prev, productLines: !prev.productLines }))}
+                      type="button"
+                    >
+                      {searchFilters.productLines.length === 0 
+                        ? 'Tuotelinjat' 
+                        : `Tuotelinjat (${searchFilters.productLines.length})`}
+                      <span className="dropdown-arrow">{dropdownOpen.productLines ? '▲' : '▼'}</span>
+                    </button>
+                    {dropdownOpen.productLines && (
+                      <div className="dropdown-menu" onClick={(e) => e.stopPropagation()}>
+                        {availableProductLines.map(productLine => (
+                          <label key={productLine} className="dropdown-item">
+                            <input
+                              type="checkbox"
+                              checked={searchFilters.productLines.includes(productLine)}
+                              onChange={() => toggleProductLine(productLine)}
+                              className="checkbox"
+                            />
+                            <span className="checkbox-text">{productLine}</span>
+                            <span className="supplier-count">
+                              ({products.filter(p => p.product_line === productLine).length})
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-          <div className="filter-group">
-            <label>Riippuvuudet:</label>
-            <select
-              value={searchFilters.hasReferences === null ? 'all' : searchFilters.hasReferences ? 'with' : 'without'}
-              onChange={(e) => {
-                const val = e.target.value;
-                setSearchFilters(prev => ({
-                  ...prev,
-                  hasReferences: val === 'all' ? null : val === 'with'
-                }));
-              }}
-              className="search-active-filter"
-              title="Suodata tuotteet riippuvuuksien mukaan (asennustavat, paketit)"
-            >
-              <option value="all">Kaikki tuotteet</option>
-              <option value="with">Vain tuotteet joilla riippuvuuksia</option>
-              <option value="without">Vain tuotteet ilman riippuvuuksia</option>
-            </select>
-          </div>
-        </div> {/* filters-section */}
-      </div> {/* search-card */}
-      </div> {/* search-section */}
+              <div className="filter-compact">
+                <select
+                  value={searchFilters.hasReferences === null ? 'all' : searchFilters.hasReferences ? 'with' : 'without'}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSearchFilters(prev => ({
+                      ...prev,
+                      hasReferences: val === 'all' ? null : val === 'with'
+                    }));
+                  }}
+                  className="select-compact"
+                  title="Suodata tuotteet riippuvuuksien mukaan"
+                >
+                  <option value="all">Riippuvuudet</option>
+                  <option value="with">Vain riippuvuudet</option>
+                  <option value="without">Ei riippuvuuksia</option>
+                </select>
+              </div>
 
-      {/* Järjestämisvalikon siirretty otsikkoriville - klikkaa sarakkeita järjestääksesi */}
+              <div className="filter-compact">
+                <select
+                  value={searchFilters.activeOnly === null ? 'all' : searchFilters.activeOnly ? 'active' : 'inactive'}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSearchFilters(prev => ({
+                      ...prev,
+                      activeOnly: val === 'all' ? null : val === 'active'
+                    }));
+                  }}
+                  className="select-compact"
+                  title="Suodata aktiiviset/passiiviset tuotteet"
+                >
+                  <option value="all">Kaikki tuotteet</option>
+                  <option value="active">Vain aktiiviset</option>
+                  <option value="inactive">Vain epäaktiiviset</option>
+                </select>
+              </div>
 
-      {/* Virhe-ilmoitus */}
-      {error && (
-        <div className="alert alert-danger">
-          <strong>Virhe:</strong> {error}
-        </div>
-      )}
+              <div className="filter-compact">
+                <select
+                  value={searchFilters.replacementStatus || 'all'}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSearchFilters(prev => ({
+                      ...prev,
+                      replacementStatus: val === 'all' ? undefined : val
+                    }));
+                  }}
+                  className="select-compact"
+                  title="Suodata tuotteet korvausstatuksen mukaan"
+                >
+                  <option value="all">Kaikki</option>
+                  <option value="not_replaced">Ei korvatut</option>
+                  <option value="replaced">Korvatut</option>
+                </select>
+              </div>
 
-      {/* Yhteysongelma */}
-      {!connectionStatus.connected && (
-        <div className="alert alert-warning">
-          <strong>Varoitus:</strong> Ei yhteyttä palvelimeen.
-        </div>
-      )}
-
-      {/* Tuotelistaus */}
-      {filteredProducts.length === 0 ? (
-        <div className="empty-state">
-          <h3>Ei tuotteita</h3>
-          <p>
-            {loading 
-              ? 'Ladataan tuotteita...'
-              : hasSearched && currentSearchQuery
-                ? `Hakusanalla "${currentSearchQuery}" ei löytynyt tuotteita.`
-                : 'Tuotteita ei löytynyt valituilla suodattimilla.'
-            }
-          </p>
-          {hasSearched && (
-            <ul>
-              <li>Tarkista hakusanan oikeinkirjoitus</li>
-              <li>Kokeile lyhyempää hakusanaa</li>
-              <li>Poista hakusuodattimia</li>
-            </ul>
-          )}
-        </div>
-      ) : (
-        <div className="products-table-container">
-          {/* Kiinteät otsikot */}
-          <div className="table-header">
-            <div className="header-row">
-              <div 
-                className={`header-cell product-number-col sortable ${sortBy === 'product_code' ? 'active' : ''}`}
-                onClick={() => handleColumnClick('product_code')}
-                title={sortBy === 'product_code' 
-                  ? `Klikkaa vaihtaaksesi järjestyksen (nyt ${sortOrder === 'asc' ? 'nouseva' : 'laskeva'})`
-                  : "Klikkaa järjestääksesi tuotekoodin mukaan"
+              <div className="results-count-compact">
+                {hasSearched 
+                  ? `${totalProducts} hakutulosta`
+                  : `${totalProducts} tuotetta`
                 }
-              >
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Järjestämisvalikon siirretty otsikkoriville - klikkaa sarakkeita järjestääksesi */}
+
+        {/* Virhe-ilmoitus */}
+        {error && (
+          <div className="alert alert-danger">
+            <strong>Virhe:</strong> {error}
+          </div>
+        )}
+
+        {/* Yhteysongelma */}
+        {!connectionStatus.connected && (
+          <div className="alert alert-warning">
+            <strong>Varoitus:</strong> Ei yhteyttä palvelimeen.
+          </div>
+        )}
+
+        {/* Tuotelistaus */}
+        {filteredProducts.length === 0 ? (
+          <div className="empty-state">
+            <h3>Ei tuotteita</h3>
+            <p>
+              {loading 
+                ? 'Ladataan tuotteita...'
+                : hasSearched && currentSearchQuery
+                  ? `Hakusanalla "${currentSearchQuery}" ei löytynyt tuotteita.`
+                  : 'Tuotteita ei löytynyt valituilla suodattimilla.'
+              }
+            </p>
+            {hasSearched && (
+              <ul>
+                <li>Tarkista hakusanan oikeinkirjoitus</li>
+                <li>Kokeile lyhyempää hakusanaa</li>
+                <li>Poista hakusuodattimia</li>
+              </ul>
+            )}
+          </div>
+        ) : (
+          <div className="products-table-container">
+            {/* Kiinteät otsikot */}
+            <div className="table-header">
+              <div className="header-row">
+                <div 
+                  className={`header-cell product-number-col sortable ${sortBy === 'product_code' ? 'active' : ''}`}
+                  onClick={() => handleColumnClick('product_code')}
+                  title={sortBy === 'product_code' 
+                    ? `Klikkaa vaihtaaksesi järjestyksen (nyt ${sortOrder === 'asc' ? 'nouseva' : 'laskeva'})`
+                    : "Klikkaa järjestääksesi tuotekoodin mukaan"
+                  }
+                >
                 Tuotenumero {sortBy === 'product_code' && (sortOrder === 'asc' ? '↑' : '↓')}
               </div>
               <div 
@@ -1092,6 +1157,11 @@ export const ProductsPage = () => {
                       <span className={`status-badge ${product.active ? 'active' : 'inactive'}`}>
                         {product.active ? 'Kyllä' : 'Ei'}
                       </span>
+                      {product.replacement_status === 'replaced' && (
+                        <span className="status-badge replaced" title={`Korvattu tuotteella: ${product.replaced_by_product_line}-${product.replaced_by_product_code}`}>
+                          Korvattu
+                        </span>
+                      )}
                     </div>
                   </div>
                   
@@ -1159,16 +1229,16 @@ export const ProductsPage = () => {
             )}
           </div>
         </div>
-      )}
+        )}
 
-      <div className="products-summary">
-        <p>
-          {hasSearched 
-            ? `Hakutulokset: ${visibleProducts.length}/${filteredProducts.length} tuotetta näytetään (${totalProducts} yhteensä)`
-            : `Näytetään ${visibleProducts.length}/${filteredProducts.length} tuotetta (${totalProducts} yhteensä)`
-          }
-        </p>
-      </div>
+        <div className="products-summary">
+          <p>
+            {hasSearched 
+              ? `Hakutulokset: ${visibleProducts.length}/${filteredProducts.length} tuotetta näytetään (${totalProducts} yhteensä)`
+              : `Näytetään ${visibleProducts.length}/${filteredProducts.length} tuotetta (${totalProducts} yhteensä)`
+            }
+          </p>
+        </div>
 
       {/* Context Menu */}
       {contextMenu && (
@@ -1214,8 +1284,7 @@ export const ProductsPage = () => {
         />
       )}
             
-      </div> {/* container-fluid */}
-    </div> {/* products-page */}
+      </div>
     </div>
   );
 };

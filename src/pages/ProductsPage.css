@@ -8,9 +8,19 @@
 
 /* Search Section */
 .search-section {
-  margin-bottom: 4rem; /* Lisätty tilaa tuotehaun ja tuotelistan väliin */
+  margin-bottom: 2rem; /* Pienempi tila */
 }
 
+/* Kompakti hakukortti */
+.search-card-compact {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg); /* Pienempi padding */
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--bs-gray-300);
+}
+
+/* Vanha search-card pidetään fallbackina */
 .search-card {
   background: var(--white);
   border-radius: var(--radius-lg);
@@ -62,6 +72,108 @@
   text-align: center;
 }
 
+/* Kompakti suodatinrivi */
+.filters-row {
+  display: flex;
+  gap: var(--spacing-md);
+  align-items: center;
+  margin-top: var(--spacing-md);
+  flex-wrap: wrap;
+}
+
+.filter-compact {
+  flex: 0 0 auto;
+  min-width: 270px; /* Leveämpiä suodattimia */
+}
+
+.dropdown-toggle-compact {
+  padding: 0.6rem 1.2rem; /* Isompi padding */
+  font-size: 1rem; /* Isompi fontti */
+  background: var(--white);
+  border: 1px solid var(--bs-gray-400);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* Nuoli oikealle */
+  color: var(--dark-color);
+  font-weight: 500;
+  white-space: nowrap;
+  width: 100%; /* Täyttää filter-compact-leveydden */
+}
+
+.dropdown-toggle-compact .dropdown-arrow {
+  color: #333; /* Sama väri kuin select-nuolessa */
+  font-size: 0.8rem;
+  margin-left: auto;
+}
+
+.dropdown-toggle-compact:hover {
+  background: var(--bs-gray-100);
+  border-color: var(--primary-color);
+}
+
+.select-compact {
+  padding: 0.6rem 1.2rem; /* Isompi padding */
+  font-size: 1rem; /* Isompi fontti */
+  border: 1px solid var(--bs-gray-400);
+  border-radius: var(--radius-md);
+  background: var(--white);
+  cursor: pointer;
+  transition: all 0.2s;
+  color: var(--dark-color);
+  width: 100%; /* Täyttää filter-compact-leveydden */
+  font-weight: 500;
+  appearance: none; /* Poistetaan selaimen oletusnuoli */
+  padding-right: 2.5rem; /* Tilaa custom-nuolelle */
+  position: relative;
+  background-image: none;
+}
+
+/* Nuoli pseudo-elementillä kuten dropdowneissa */
+.filter-compact {
+  position: relative;
+}
+
+.filter-compact::after {
+  content: '▼';
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #333;
+  font-size: 0.8rem;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Piilotetaan nuoli jos kyseessä on dropdown-filter */
+.filter-compact:has(.dropdown-filter)::after {
+  display: none;
+}
+
+.select-compact:hover {
+  border-color: var(--primary-color);
+  background: var(--bs-gray-100);
+}
+
+.results-count-compact {
+  margin-left: auto;
+  padding: 0.6rem 1.2rem;
+  font-size: 1rem;
+  color: var(--bs-gray-600);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.loading-text {
+  font-size: 0.95rem;
+  color: var(--bs-gray-500);
+  margin: 0;
+  padding: 0.6rem 1.2rem;
+}
+
 .search-form {
   display: flex;
   flex-direction: column;
@@ -85,7 +197,7 @@
 
 .search-input-with-clear {
   flex: 1;
-  padding: var(--spacing-md) 50px var(--spacing-md) var(--spacing-lg);
+  padding: var(--spacing-md) 50px var(--spacing-md) var(--spacing-lg); /* Oikea padding napille */
   border: 2px solid var(--bs-gray-400);
   border-radius: var(--radius-md);
   font-size: var(--font-size-lg);
@@ -108,7 +220,7 @@
 
 .search-clear-btn {
   position: absolute;
-  right: 190px; /* Sopiva väli aktiiviset-valikon kanssa */
+  right: 10px; /* Siirretty kentän loppuun */
   top: 50%;
   transform: translateY(-50%);
   background: none;
@@ -554,7 +666,7 @@
   display: grid;
   grid-template-columns: 200px 1fr 1fr 150px 150px 100px 120px;
   gap: 1px;
-  min-height: 60px;
+  min-height: 48px; /* Pienempi rivikorkeus (oli 60px) */
   border-bottom: 1px solid var(--bs-gray-200);
   transition: background-color 0.2s ease;
 }
@@ -564,13 +676,13 @@
 }
 
 .product-cell {
-  padding: var(--spacing-md);
+  padding: 0.5rem 0.75rem; /* Pienempi padding (oli var(--spacing-md)) */
   display: flex;
   align-items: center;
   border-right: 1px solid var(--bs-gray-200);
   word-break: break-word;
   overflow: hidden;
-  font-size: 14px;
+  font-size: 13px; /* Pienempi fontti (oli 14px) */
   background: var(--white);
   color: var(--bs-gray-900); /* Tumma teksti valkoista taustaa vasten */
 }
@@ -611,6 +723,7 @@
   font-size: var(--font-size-xs);
   font-weight: 600;
   text-transform: uppercase;
+  margin-right: 0.25rem;
 }
 
 .status-badge.active {
@@ -623,6 +736,18 @@
   background: var(--bs-danger-bg-subtle);
   color: var(--bs-danger);
   border: 1px solid var(--bs-danger-border-subtle);
+}
+
+.status-badge.replaced {
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeaa7;
+}
+
+.status-badge.discontinued {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
 }
 
 /* Loading more indicator */
@@ -920,6 +1045,8 @@
 .status-col {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem;
 }
 
 /* Asennustavat-rivi */
@@ -1085,4 +1212,103 @@
   text-align: left;
   display: inline-block;
   color: var(--bs-gray-600);
+}
+
+/* Dropdown-suodattimet */
+.dropdown-filter {
+  position: relative;
+  width: 100%;
+}
+
+.dropdown-toggle {
+  width: 100%;
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: var(--white);
+  border: 2px solid var(--bs-gray-400);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  color: var(--bs-gray-900);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: all 0.2s ease-in-out;
+}
+
+.dropdown-toggle:hover {
+  border-color: var(--primary-color);
+  background: var(--bs-gray-50);
+}
+
+.dropdown-toggle:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.2);
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 4px;
+  background: var(--white);
+  border: 2px solid var(--bs-gray-400);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 1000;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  padding: var(--spacing-sm) var(--spacing-md);
+  cursor: pointer;
+  transition: background-color 0.15s ease-in-out;
+  border-bottom: 1px solid var(--bs-gray-200);
+}
+
+.dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.dropdown-item:hover {
+  background-color: var(--bs-gray-100);
+}
+
+.dropdown-item .checkbox {
+  margin-right: var(--spacing-sm);
+  cursor: pointer;
+}
+
+.dropdown-item .checkbox-text {
+  flex: 1;
+  color: var(--bs-gray-900);
+}
+
+.dropdown-item .supplier-count {
+  color: var(--bs-gray-600);
+  font-size: 0.875rem;
+  margin-left: var(--spacing-sm);
+}
+
+/* Scrollbar styling for dropdown */
+.dropdown-menu::-webkit-scrollbar {
+  width: 8px;
+}
+
+.dropdown-menu::-webkit-scrollbar-track {
+  background: var(--bs-gray-100);
+  border-radius: var(--radius-md);
+}
+
+.dropdown-menu::-webkit-scrollbar-thumb {
+  background: var(--bs-gray-400);
+  border-radius: var(--radius-md);
+}
+
+.dropdown-menu::-webkit-scrollbar-thumb:hover {
+  background: var(--bs-gray-500);
 }
