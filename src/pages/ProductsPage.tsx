@@ -149,7 +149,9 @@ export const ProductsPage = () => {
     productLines: [] as string[], // Tuotelinjat
     activeOnly: null as boolean | null,
     hasReferences: null as boolean | null,
-    replacementStatus: undefined as string | undefined
+    replacementStatus: undefined as string | undefined,
+    updatedAfter: undefined as string | undefined,
+    hasInstallationMethod: null as boolean | null // null = kaikki, true = vain asennustavalla, false = ilman asennustapaa
   });
 
   // Dropdownien avaus/sulku tila
@@ -177,6 +179,8 @@ export const ProductsPage = () => {
         activeOnly?: boolean;
         hasReferences?: boolean;
         replacementStatus?: string;
+        updatedAfter?: string;
+        hasInstallationMethod?: boolean;
       };
 
       if (query && query.trim()) {
@@ -200,6 +204,16 @@ export const ProductsPage = () => {
       if (searchFilters.replacementStatus !== undefined) {
         searchParams.replacementStatus = searchFilters.replacementStatus;
         console.log('🔍 Replacement status filter:', searchFilters.replacementStatus);
+      }
+      
+      if (searchFilters.updatedAfter !== undefined) {
+        searchParams.updatedAfter = searchFilters.updatedAfter;
+        console.log('🔍 Updated after filter:', searchFilters.updatedAfter);
+      }
+      
+      if (searchFilters.hasInstallationMethod !== null) {
+        searchParams.hasInstallationMethod = searchFilters.hasInstallationMethod;
+        console.log('🔍 Installation method filter:', searchFilters.hasInstallationMethod);
       }
       
       if (searchFilters.suppliers.length > 0) {
@@ -489,7 +503,9 @@ export const ProductsPage = () => {
       productLines: [],
       activeOnly: null,
       hasReferences: null,
-      replacementStatus: undefined
+      replacementStatus: undefined,
+      updatedAfter: undefined,
+      hasInstallationMethod: null
     });
     loadProducts();
   };
@@ -778,6 +794,7 @@ export const ProductsPage = () => {
 
   // Tuotteet järjestettyinä - kaikki haku ja suodatus tapahtuu palvelimella
   const filteredProducts = useMemo(() => {
+    // Järjestä tuotteet (backend hoitaa suodatuksen)
     return [...products].sort((a, b) => {
       let comparison = 0;
       
@@ -977,6 +994,25 @@ export const ProductsPage = () => {
 
               <div className="filter-compact">
                 <select
+                  value={searchFilters.hasInstallationMethod === null ? 'all' : searchFilters.hasInstallationMethod ? 'with' : 'without'}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSearchFilters(prev => ({
+                      ...prev,
+                      hasInstallationMethod: val === 'all' ? null : val === 'with'
+                    }));
+                  }}
+                  className="select-compact"
+                  title="Suodata tuotteet asennustapojen mukaan"
+                >
+                  <option value="all">Kaikki tuotteet</option>
+                  <option value="with">Vain asennustavalla</option>
+                  <option value="without">Ilman asennustapaa</option>
+                </select>
+              </div>
+
+              <div className="filter-compact">
+                <select
                   value={searchFilters.replacementStatus || 'all'}
                   onChange={(e) => {
                     const val = e.target.value;
@@ -992,6 +1028,22 @@ export const ProductsPage = () => {
                   <option value="not_replaced">Ei korvatut</option>
                   <option value="replaced">Korvatut</option>
                 </select>
+              </div>
+
+              <div className="filter-compact">
+                <input
+                  type="date"
+                  value={searchFilters.updatedAfter || ''}
+                  onChange={(e) => {
+                    setSearchFilters(prev => ({
+                      ...prev,
+                      updatedAfter: e.target.value || undefined
+                    }));
+                  }}
+                  className="select-compact"
+                  title="Näytä tuotteet jotka on muokattu tästä päivästä alkaen"
+                  placeholder="Muokattu alkaen..."
+                />
               </div>
 
               <div className="results-count-compact">

@@ -71,4 +71,5 @@ export interface ProductSearchParams {
   productLines?: string[];
   hasReferences?: boolean;
   replacementStatus?: string;
+  updatedAfter?: string;
 }

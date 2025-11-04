@@ -49,6 +49,10 @@ export const PackagesPage = () => {
   const [showAddInstallationMethodModal, setShowAddInstallationMethodModal] = useState(false);
   const [selectedInstallationMethodId, setSelectedInstallationMethodId] = useState<number | null>(null);
 
+  // Paketin nimen muokkaus
+  const [editingPackageNumber, setEditingPackageNumber] = useState<string | null>(null);
+  const [editingPackageName, setEditingPackageName] = useState('');
+
   const loadPackages = useCallback(async () => {
     if (!socketClient || !connectionStatus.connected) return;
     
@@ -170,6 +174,80 @@ export const PackagesPage = () => {
       alert('Virhe tuotteen lisäämisessä');
     }
   }, [selectedPackage, socketClient, loadPackageDetails]);
+
+  const deletePackage = async (pkg: Package, event: React.MouseEvent) => {
+    event.stopPropagation(); // Estä paketin avautuminen kun poistetaan
+    
+    if (!socketClient) return;
+    
+    if (!confirm(`Haluatko varmasti poistaa paketin ${pkg.package_product_line}-${pkg.package_number} "${pkg.package_name}"?\n\nTämä poistaa paketin ja kaikki siihen liittyvät tiedot.`)) return;
+    
+    try {
+      const response = await socketClient.apiRequest('delete_package', {
+        package_product_line: pkg.package_product_line,
+        package_number: pkg.package_number
+      }) as { success: boolean; message?: string };
+      
+      if (response.success) {
+        // Päivitä lista
+        await loadPackages();
+        // Jos poistettu paketti oli valittuna, tyhjennä valinta
+        if (selectedPackage?.package_number === pkg.package_number) {
+          setSelectedPackage(null);
+        }
+      } else {
+        alert('Virhe paketin poistamisessa: ' + (response.message || 'Tuntematon virhe'));
+      }
+    } catch (error) {
+      console.error('Error deleting package:', error);
+      alert('Virhe paketin poistamisessa');
+    }
+  };
+
+  // Paketin nimen muokkaus
+  const startEditPackageName = (pkg: Package, event: React.MouseEvent) => {
+    event.stopPropagation();
+    setEditingPackageNumber(`${pkg.package_product_line}-${pkg.package_number}`);
+    setEditingPackageName(pkg.package_name);
+  };
+
+  const cancelEditPackageName = () => {
+    setEditingPackageNumber(null);
+    setEditingPackageName('');
+  };
+
+  const savePackageName = async (pkg: Package, event: React.MouseEvent) => {
+    event.stopPropagation();
+    
+    if (!socketClient || !editingPackageName.trim()) {
+      cancelEditPackageName();
+      return;
+    }
+
+    try {
+      const response = await socketClient.apiRequest('update_package', {
+        id: `${pkg.package_product_line}-${pkg.package_number}`,
+        package_name: editingPackageName.trim()
+      }) as { success: boolean; message?: string };
+
+      if (response.success) {
+        await loadPackages();
+        // Päivitä valittu paketti jos muokattiin sitä
+        if (selectedPackage?.package_number === pkg.package_number) {
+          setSelectedPackage({
+            ...selectedPackage,
+            package_name: editingPackageName.trim()
+          });
+        }
+        cancelEditPackageName();
+      } else {
+        alert('Virhe paketin nimen tallentamisessa: ' + (response.message || 'Tuntematon virhe'));
+      }
+    } catch (error) {
+      console.error('Error updating package name:', error);
+      alert('Virhe paketin nimen tallentamisessa');
+    }
+  };
 
   const removePackageProduct = async (productLine: string, productCode: string) => {
     if (!selectedPackage || !socketClient) return;
@@ -593,29 +671,92 @@ export const PackagesPage = () => {
                     <div className="header-cell package-name-col sortable" onClick={() => setSortBy('package_name')}>
                       Nimi {sortBy === 'package_name' && '↑'}
                     </div>
+                    <div className="header-cell package-actions-col">
+                      Toiminnot
+                    </div>
                   </div>
                 </div>
                 
                 {/* Scrollattava sisältöalue */}
                 <div className="table-body">
-                  {filteredPackages.map((pkg) => (
-                    <div 
-                      key={pkg.package_id || pkg.package_number} 
-                      className={`package-row ${selectedPackage?.package_number === pkg.package_number ? 'selected' : ''}`}
-                      onClick={() => loadPackageDetails(pkg)}
-                    >
-                      <div className="package-cell package-number-col">
-                        <div className="package-number-content">
-                          <span className="package-line">{pkg.package_product_line}</span>
-                          <span className="package-separator">-</span>
-                          <span className="package-code">{pkg.package_number}</span>
+                  {filteredPackages.map((pkg) => {
+                    const packageKey = `${pkg.package_product_line}-${pkg.package_number}`;
+                    const isEditing = editingPackageNumber === packageKey;
+                    
+                    return (
+                      <div 
+                        key={pkg.package_id || pkg.package_number} 
+                        className={`package-row ${selectedPackage?.package_number === pkg.package_number ? 'selected' : ''}`}
+                        onClick={() => !isEditing && loadPackageDetails(pkg)}
+                      >
+                        <div className="package-cell package-number-col">
+                          <div className="package-number-content">
+                            <span className="package-line">{pkg.package_product_line}</span>
+                            <span className="package-separator">-</span>
+                            <span className="package-code">{pkg.package_number}</span>
+                          </div>
+                        </div>
+                        <div className="package-cell package-name-col">
+                          {isEditing ? (
+                            <input
+                              type="text"
+                              className="package-name-edit"
+                              value={editingPackageName}
+                              onChange={(e) => setEditingPackageName(e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  const mouseEvent = new MouseEvent('click', { bubbles: true }) as unknown as React.MouseEvent;
+                                  savePackageName(pkg, mouseEvent);
+                                }
+                                if (e.key === 'Escape') cancelEditPackageName();
+                              }}
+                              autoFocus
+                            />
+                          ) : (
+                            pkg.package_name
+                          )}
+                        </div>
+                        <div className="package-cell package-actions-col">
+                          {isEditing ? (
+                            <>
+                              <button 
+                                className="btn btn-success btn-sm"
+                                onClick={(e) => savePackageName(pkg, e)}
+                                title="Tallenna"
+                              >
+                                ✓
+                              </button>
+                              <button 
+                                className="btn btn-secondary btn-sm"
+                                onClick={(e) => { e.stopPropagation(); cancelEditPackageName(); }}
+                                title="Peruuta"
+                              >
+                                ✕
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button 
+                                className="btn btn-primary btn-sm"
+                                onClick={(e) => startEditPackageName(pkg, e)}
+                                title="Muokkaa nimeä"
+                              >
+                                ✏️
+                              </button>
+                              <button 
+                                className="btn btn-danger btn-sm"
+                                onClick={(e) => deletePackage(pkg, e)}
+                                title="Poista paketti"
+                              >
+                                🗑️
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
-                      <div className="package-cell package-name-col">
-                        {pkg.package_name}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}

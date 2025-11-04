@@ -45,7 +45,10 @@ export const ProductSearchModal = ({ isOpen, onClose, onSelectProduct, title = "
     setLoading(true);
     try {
       console.log('Searching products with query:', query);
-      const response = await socketClient.searchProducts(query.trim());
+      // Haetaan vain aktiiviset tuotteet (sama kuin ProductsPage oletussuodatin)
+      const response = await socketClient.searchProducts(query.trim(), {
+        activeOnly: true  // Vain aktiiviset tuotteet
+      });
       console.log('Search response:', response);
       console.log('Response.data type:', typeof response.data);
       console.log('Response.data:', response.data);

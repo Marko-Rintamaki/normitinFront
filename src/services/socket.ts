@@ -229,6 +229,7 @@ export class SocketClient {
     suppliers?: string[];
     productLines?: string[];
     replacementStatus?: string;
+    updatedAfter?: string;
   }): Promise<ApiResponse<ProductSearchResponse>> {
     return this.apiRequest('search_products', {
       query,
@@ -246,6 +247,7 @@ export class SocketClient {
     suppliers?: string[];
     productLines?: string[];
     replacementStatus?: string;
+    updatedAfter?: string;
   }): Promise<ApiResponse<ProductSearchResponse>> {
     return this.apiRequest('search_products_with_installations', {
       query,

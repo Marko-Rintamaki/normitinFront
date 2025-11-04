@@ -125,7 +125,7 @@
 
 .packages-page .header-row {
   display: grid;
-  grid-template-columns: 200px 1fr;
+  grid-template-columns: 200px 1fr 100px;
   gap: 1px;
   min-height: 50px;
 }
@@ -182,7 +182,7 @@
 /* Pakettirivi */
 .package-row {
   display: grid;
-  grid-template-columns: 200px 1fr;
+  grid-template-columns: 200px 1fr 100px;
   gap: 1px;
   min-height: 60px;
   border-bottom: 1px solid #e9ecef;
@@ -213,6 +213,36 @@
 
 .package-cell:last-child {
   border-right: none;
+}
+
+/* Toiminto-sarake */
+.package-actions-col {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.package-actions-col .btn {
+  padding: 0.4rem 0.8rem;
+  font-size: 1rem;
+  min-width: auto;
+}
+
+/* Paketin nimen muokkauskenttä */
+.package-name-edit {
+  width: 100%;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.95rem;
+  border: 2px solid var(--primary-color);
+  border-radius: 4px;
+  outline: none;
+  font-family: inherit;
+}
+
+.package-name-edit:focus {
+  border-color: var(--success-color);
+  box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.1);
 }
 
 /* Pakettinumero sarake - tuotelinja ja numero samalla rivillä */
