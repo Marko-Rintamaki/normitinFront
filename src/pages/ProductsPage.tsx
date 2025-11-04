@@ -51,11 +51,12 @@ export const ProductsPage = () => {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [totalProducts, setTotalProducts] = useState(0);
   
-  // Virtualisointi ja lazy loading
-  const [displayedCount, setDisplayedCount] = useState(50); // Aloitetaan 50 tuotteella
+  // Backend-pohjainen sivutus (infinite scroll)
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [currentOffset, setCurrentOffset] = useState(0);
   const tableBodyRef = useRef<HTMLDivElement>(null);
-  const ITEMS_PER_LOAD = 50;
+  const ITEMS_PER_PAGE = 100; // Haetaan 100 tuotetta kerralla backendistä
   
   // Toimittajat ja tuotelinjat - ladataan aina näkyviin
   const [availableSuppliers, setAvailableSuppliers] = useState<{supplier_code: string; supplier_name: string}[]>([]);
@@ -160,17 +161,26 @@ export const ProductsPage = () => {
     productLines: false
   });
 
-  const loadProducts = useCallback(async (query?: string) => {
+  const loadProducts = useCallback(async (query?: string, append = false) => {
     if (!socketClient || !connectionStatus.connected) return;
     
     try {
-      setLoading(true);
+      if (!append) {
+        setLoading(true);
+        setCurrentOffset(0);
+      } else {
+        setIsLoadingMore(true);
+      }
       setError(null);
       
+      const offset = append ? currentOffset : 0;
+      
       const searchParams = {
-        limit: 10000  // Nostetaan limit isoksi että saadaan kaikki tuotelinjat
+        limit: ITEMS_PER_PAGE,  // 100 tuotetta kerralla
+        offset: offset
       } as {
         limit: number;
+        offset: number;
         query?: string;
         supplier?: string;
         productLine?: string;
@@ -232,19 +242,30 @@ export const ProductsPage = () => {
       console.log('🔍 Products received:', response.data?.products.length);
       
       if (response.success && response.data) {
-        setProducts(response.data.products || []);
+        if (append) {
+          // Lisätään uudet tuotteet vanhojen perään
+          setProducts(prev => [...prev, ...(response.data?.products || [])]);
+        } else {
+          // Korvataan kaikki tuotteet
+          setProducts(response.data.products || []);
+        }
         setTotalProducts(response.data.pagination?.total || 0);
+        setHasMore(response.data.pagination?.hasMore || false);
+        setCurrentOffset(offset + (response.data.products?.length || 0));
       } else {
         throw new Error(response.message || 'Failed to load products');
       }
     } catch (error) {
       console.error('Error loading products:', error);
       setError(error instanceof Error ? error.message : 'Failed to load products');
-      setProducts([]);
+      if (!append) {
+        setProducts([]);
+      }
     } finally {
       setLoading(false);
+      setIsLoadingMore(false);
     }
-  }, [socketClient, connectionStatus.connected, searchFilters]);
+  }, [socketClient, connectionStatus.connected, searchFilters, currentOffset, ITEMS_PER_PAGE]);
 
     // Hae saatavilla olevat toimittajat suppliers-taulusta
   const loadSuppliers = useCallback(async () => {
@@ -310,62 +331,76 @@ export const ProductsPage = () => {
   };
 
   useEffect(() => {
-    if (!hasSearched) {
-      loadProducts();
+    // Ladataan data järjestyksessä initial loadissa
+    const initializeData = async () => {
+      if (!socketClient || !connectionStatus.connected) return;
+      
+      try {
+        // 1. Lataa toimittajat ja tuotelinjat ensin (tarvitaan suodattimiin)
+        await Promise.all([
+          loadSuppliers(),
+          loadProductLines()
+        ]);
+        
+        // 2. Lataa asennustavat ja paketit taustalla
+        Promise.all([
+          loadAllInstallationsOnce(),
+          loadAllPackagesOnce()
+        ]);
+        
+        // 3. Lataa tuotteet vasta kun suodattimet on valmiit
+        if (!hasSearched) {
+          loadProducts();
+        }
+      } catch (error) {
+        console.error('Initialization error:', error);
+      }
+    };
+    
+    initializeData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socketClient, connectionStatus.connected]); // Vain kerran kun yhteys on valmis
+
+  // Lataa kaikki asennustavat muistiin kerran
+  const loadAllInstallationsOnce = async () => {
+    if (!socketClient || allInstallationsLoaded) return;
+    
+    try {
+      console.log('🔧 Ladataan kaikki asennustavat muistiin...');
+      const response = await socketClient.getAllProductInstallations();
+      
+      if (response && response.success && Array.isArray(response.data)) {
+        setAllInstallations(response.data);
+        setAllInstallationsLoaded(true);
+        console.log(`✅ Ladattu ${response.data.length} asennustapaa muistiin`);
+      } else {
+        console.error('❌ Kaikkien asennustapojen lataus epäonnistui:', response);
+      }
+    } catch (error) {
+      console.error('Kaikkien asennustapojen lataus epäonnistui:', error);
     }
-    // Hae toimittajat ja tuotelinjat aina kun komponentti latautuu
-    loadSuppliers();
-    loadProductLines();
-  }, [loadProducts, loadSuppliers, loadProductLines, hasSearched]);
+  };
 
-  // Lataa kaikki asennustavat muistiin kerran sovelluksen käynnistyessä
-  useEffect(() => {
-    const loadAllInstallations = async () => {
-      if (!socketClient || allInstallationsLoaded) return;
+  // Lataa kaikki paketit muistiin kerran
+  const loadAllPackagesOnce = async () => {
+    if (!socketClient || allPackagesLoaded) return;
+    
+    try {
+      console.log('📦 Ladataan kaikki paketit muistiin...');
+      const response = await socketClient.getAllPackages();
       
-      try {
-        console.log('🔧 Ladataan kaikki asennustavat muistiin...');
-        const response = await socketClient.getAllProductInstallations();
-        
-        if (response && response.success && Array.isArray(response.data)) {
-          setAllInstallations(response.data);
-          setAllInstallationsLoaded(true);
-          console.log(`✅ Ladattu ${response.data.length} asennustapaa muistiin`);
-        } else {
-          console.error('❌ Kaikkien asennustapojen lataus epäonnistui:', response);
-        }
-      } catch (error) {
-        console.error('Kaikkien asennustapojen lataus epäonnistui:', error);
+      if (response && response.success && Array.isArray(response.data)) {
+        setAllPackages(response.data);
+        setAllPackagesLoaded(true);
+        console.log(`✅ Ladattu ${response.data.length} pakettia muistiin`);
+        console.log('📦 Pakettidata:', response.data);
+      } else {
+        console.log('ℹ️ Pakettien lataus: ei dataa tai epäonnistui:', response);
       }
-    };
-
-    loadAllInstallations();
-  }, [socketClient, allInstallationsLoaded]);
-
-  // Lataa kaikki paketit muistiin kerran sovelluksen käynnistyessä
-  useEffect(() => {
-    const loadAllPackages = async () => {
-      if (!socketClient || allPackagesLoaded) return;
-      
-      try {
-        console.log('📦 Ladataan kaikki paketit muistiin...');
-        const response = await socketClient.getAllPackages();
-        
-        if (response && response.success && Array.isArray(response.data)) {
-          setAllPackages(response.data);
-          setAllPackagesLoaded(true);
-          console.log(`✅ Ladattu ${response.data.length} pakettia muistiin`);
-          console.log('📦 Pakettidata:', response.data);
-        } else {
-          console.log('ℹ️ Pakettien lataus: ei dataa tai epäonnistui:', response);
-        }
-      } catch (error) {
-        console.error('Kaikkien pakettien lataus epäonnistui:', error);
-      }
-    };
-
-    loadAllPackages();
-  }, [socketClient, allPackagesLoaded]);
+    } catch (error) {
+      console.error('Kaikkien pakettien lataus epäonnistui:', error);
+    }
+  };
 
   // Päivittää kaikki asennustavat uudelleen (esim. lisäyksen/poiston jälkeen)
   const refreshAllInstallations = useCallback(async () => {
@@ -402,16 +437,25 @@ export const ProductsPage = () => {
     }
   }, [socketClient]);
 
-  // Reagoi suodattimien muutoksiin - käynnistä uusi haku
+  // Reagoi suodattimien muutoksiin - käynnistä uusi haku (debounced)
   useEffect(() => {
-    if (hasSearched) {
-      // Jos on hakutilassa, käynnistä haku uudelleen tallennetulla hakusanalla
-      loadProducts(currentSearchQuery);
-    } else {
-      // Jos on selailutilassa, käynnistä yleishaku
-      loadProducts();
-    }
-  }, [searchFilters, hasSearched, loadProducts, currentSearchQuery]); // ✅ Käytetään currentSearchQuery
+    // Älä tee hakua heti komponentin mountissa
+    if (!socketClient || !connectionStatus.connected) return;
+    
+    // Debounce: odota 300ms ennen haun käynnistämistä
+    const timer = setTimeout(() => {
+      if (hasSearched) {
+        // Jos on hakutilassa, käynnistä haku uudelleen tallennetulla hakusanalla
+        loadProducts(currentSearchQuery);
+      } else {
+        // Jos on selailutilassa, käynnistä yleishaku
+        loadProducts();
+      }
+    }, 300);
+    
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchFilters]); // Vain kun filtterit muuttuvat
 
   // Sulje dropdownit kun klikataan muualle
   useEffect(() => {
@@ -449,7 +493,7 @@ export const ProductsPage = () => {
     const timer = setTimeout(adjustHeaderPadding, 100);
     
     return () => clearTimeout(timer);
-  }, [products, displayedCount]);
+  }, [products]);
 
   // Debounced automaattinen haku - 500ms viive kirjoittamisen lopettamisen jälkeen
   useEffect(() => {
@@ -792,9 +836,12 @@ export const ProductsPage = () => {
     }
   };
 
-  // Tuotteet järjestettyinä - kaikki haku ja suodatus tapahtuu palvelimella
+  // POISTETTU: Automaattinen asennustapojen lataus kaikille tuotteille
+  // Tämä aiheutti liikaa tietokantayhteyksiä ja kaatoi järjestelmän
+
+  // Tuotteet suoraan backendistä - järjestetään vain frontendissä
   const filteredProducts = useMemo(() => {
-    // Järjestä tuotteet (backend hoitaa suodatuksen)
+    // Järjestä tuotteet (backend hoitaa haun ja suodatuksen)
     return [...products].sort((a, b) => {
       let comparison = 0;
       
@@ -820,35 +867,22 @@ export const ProductsPage = () => {
     });
   }, [products, sortBy, sortOrder]);
 
-  // POISTETTU: Automaattinen asennustapojen lataus kaikille tuotteille
-  // Tämä aiheutti liikaa tietokantayhteyksiä ja kaatoi järjestelmän
-
-  // Virtualisointi - näytetään vain tietty määrä tuotteita
-  const visibleProducts = useMemo(() => {
-    return filteredProducts.slice(0, displayedCount);
-  }, [filteredProducts, displayedCount]);
-
-  // Scroll handler lisää tuotteita tarpeen mukaan
+  // Scroll handler hakee lisää tuotteita backendistä
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
     const scrollPercentage = (scrollTop + clientHeight) / scrollHeight;
     
-    // Kun scrollataan 80% loppuun, ladataan lisää
-    if (scrollPercentage > 0.8 && !isLoadingMore && displayedCount < filteredProducts.length) {
-      setIsLoadingMore(true);
-      
-      // Simuloidaan loading delay
-      setTimeout(() => {
-        setDisplayedCount(prev => Math.min(prev + ITEMS_PER_LOAD, filteredProducts.length));
-        setIsLoadingMore(false);
-      }, 200);
+    // Kun scrollataan 80% loppuun ja on vielä lisää dataa, haetaan lisää backendistä
+    if (scrollPercentage > 0.8 && !isLoadingMore && hasMore && !loading) {
+      loadProducts(currentSearchQuery || undefined, true); // append = true
     }
-  }, [isLoadingMore, displayedCount, filteredProducts.length, ITEMS_PER_LOAD]);
+  }, [isLoadingMore, hasMore, loading, loadProducts, currentSearchQuery]);
 
-  // Reset displayed count kun filtterit muuttuvat
+  // Reset offset kun filtterit tai haku muuttuvat
   useEffect(() => {
-    setDisplayedCount(ITEMS_PER_LOAD);
-  }, [searchQuery, searchFilters, ITEMS_PER_LOAD]);
+    setCurrentOffset(0);
+    setHasMore(true);
+  }, [searchQuery, searchFilters]);
 
   // Näytä loading vain alussa kun ei ole vielä haettu mitään
   if (loading && products.length === 0 && !hasSearched) {
@@ -1149,7 +1183,7 @@ export const ProductsPage = () => {
             ref={tableBodyRef}
             onScroll={handleScroll}
           >
-            {visibleProducts.map((product) => {
+            {filteredProducts.map((product) => {
               const productKey = `${product.product_line}-${product.product_code}`;
               const isExpanded = expandedRows.has(productKey);
               const installations = installationData[productKey] || [];
@@ -1286,9 +1320,10 @@ export const ProductsPage = () => {
         <div className="products-summary">
           <p>
             {hasSearched 
-              ? `Hakutulokset: ${visibleProducts.length}/${filteredProducts.length} tuotetta näytetään (${totalProducts} yhteensä)`
-              : `Näytetään ${visibleProducts.length}/${filteredProducts.length} tuotetta (${totalProducts} yhteensä)`
+              ? `Hakutulokset: ${filteredProducts.length} tuotetta (${totalProducts} yhteensä)`
+              : `Näytetään ${filteredProducts.length} tuotetta (${totalProducts} yhteensä)`
             }
+            {hasMore && ' - scrollaa nähdäksesi lisää'}
           </p>
         </div>
 
