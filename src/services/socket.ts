@@ -203,8 +203,15 @@ export class SocketClient {
         reject(new Error('API request timeout'));
       }, this.config.timeout);
 
+      // Hae token localStoragesta ja lisää se requestDataan
+      const token = localStorage.getItem('normitin_token');
+      
       // Lähetä parametrit suoraan requestData-objektissa, älä params-objektissa
-      const requestData = { action, ...params };
+      const requestData = { 
+        action, 
+        token,  // Lisää token jokaiseen pyyntöön
+        ...params 
+      };
       
       this.socket.emit('api-request', requestData, (response: ApiResponse) => {
         clearTimeout(timeout);

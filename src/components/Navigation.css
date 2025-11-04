@@ -41,6 +41,36 @@
   border-color: rgba(255, 255, 255, 0.4);
 }
 
+.nav-user {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.user-info {
+  color: white;
+  font-weight: 500;
+  padding: 0.5rem;
+}
+
+.logout-button {
+  padding: 0.5rem 1rem;
+  background: rgba(255, 59, 48, 0.9);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.logout-button:hover {
+  background: rgb(255, 59, 48);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(255, 59, 48, 0.3);
+}
+
 @media (max-width: 768px) {
   .nav-list {
     flex-wrap: wrap;
